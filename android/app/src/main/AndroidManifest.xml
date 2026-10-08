@@ -26,7 +26,7 @@
         android:required="false"/>
 
     <application
-        android:label="smart_money_v2"
+        android:label="Quản lý chi tiêu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

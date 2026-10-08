@@ -49,7 +49,7 @@ class SmartMoneyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SmartMoney',
+      title: 'Quản lý chi tiêu',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: AppColors.background,
