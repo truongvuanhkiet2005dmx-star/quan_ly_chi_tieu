@@ -1,48 +1,56 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# Operating system files
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+Thumbs.db
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
+# Editors and IDEs
+.vscode/
 .idea/
+*.iml
+*.swp
+*.swo
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# Flutter/Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
+frontend/**/build/
+frontend/**/.dart_tool/
+frontend/**/.flutter-plugins-dependencies
+frontend/**/doc/api/
+frontend/**/android/app/debug/
+frontend/**/android/app/profile/
+frontend/**/android/app/release/
+frontend/**/ios/Flutter/.last_build_id
+frontend/**/*.symbolicated
+frontend/**/*.obfuscated
 
-# Symbolication related
-app.*.symbols
+# ASP.NET Core / C#
+backend/**/bin/
+backend/**/obj/
+backend/**/out/
+backend/**/*.user
+backend/**/*.suo
+backend/**/.vs/
+backend/**/TestResults/
+backend/**/appsettings.Development.json
+backend/**/appsettings.Local.json
 
-# Obfuscation related
-app.*.map.json
+# NuGet and package caches
+**/.nuget/
+**/packages/
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Widget Preview related
-.widget_preview/
+# Environment and secrets
+.env
+.env.*
+!.env.example
+**/*.pfx
+**/*.key
