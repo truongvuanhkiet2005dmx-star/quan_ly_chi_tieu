@@ -1,0 +1,6 @@
+@Backend_Nhom6_QuanLyChiTieu_HostAddress = http://localhost:5104
+
+GET {{Backend_Nhom6_QuanLyChiTieu_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
