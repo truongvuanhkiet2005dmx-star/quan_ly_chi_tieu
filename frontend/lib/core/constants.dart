@@ -20,7 +20,6 @@ class AppConstants {
     'com.bidv.smartbanking',
     'com.msb.mobile',
     'com.mbbank.mobile',
-    'com.zing.zalo',
     'com.zalopay.app',
     'com.android.mms',
     'com.samsung.android.messaging',

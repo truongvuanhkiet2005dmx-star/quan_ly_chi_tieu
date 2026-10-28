@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
+import 'welcome_setup_screen.dart';
 
 class SavingsScreen extends StatefulWidget {
   const SavingsScreen({super.key});
@@ -23,7 +24,17 @@ class _SavingsScreenState extends State<SavingsScreen> {
 
   Future<void> _loadSavingsGoals() async {
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId') ?? 1;
+    final userId = prefs.getInt('userId');
+
+    if (userId == null) {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const WelcomeSetupScreen()),
+            (route) => false,
+      );
+      return;
+    }
 
     final goals = await DatabaseHelper.instance.getSavingsGoals(userId);
 

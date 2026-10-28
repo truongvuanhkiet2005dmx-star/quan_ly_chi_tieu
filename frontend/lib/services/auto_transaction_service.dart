@@ -83,7 +83,7 @@ class AutoTransactionService {
       message = evt;
     }
 
-    // F4: Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội
+    // Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội/Zalo (N2)
     if (pkg.isNotEmpty) {
       bool isAllowed = AppConstants.allowedBankPackages.any((allowed) => pkg.contains(allowed));
       if (!isAllowed && !pkg.contains('sms') && !pkg.contains('messaging') && !pkg.contains('mms')) {
@@ -96,7 +96,6 @@ class AutoTransactionService {
       return;
     }
 
-    // F1: Đọc bigText, subText và textLines giúp bóc tách số tiền trong thông báo MoMo/Bank VN
     String combinedLines = textLines.join('\n');
     String fullContent = "$title\n$text\n$message\n$bigText\n$subText\n$combinedLines".trim();
 
@@ -203,7 +202,6 @@ class AutoTransactionService {
   }
 
   Future<void> processSmsContent(String content, {bool force = false, String packageName = ''}) async {
-    // 1. Bỏ qua thông báo của chính ứng dụng SmartMoney tạo ra (chống lặp)
     if (!force && (content.contains('SmartMoney') || content.contains('Chi tiêu tự động') || content.contains('Thu nhập tự động'))) {
       return;
     }
@@ -224,7 +222,6 @@ class AutoTransactionService {
       return;
     }
 
-    // F3: Chống lặp thông báo qua SharedPreferences đồng bộ giữa các Isolate
     String cacheKey = content.trim();
     if (!force) {
       final prefs = await SharedPreferences.getInstance();
@@ -256,7 +253,6 @@ class AutoTransactionService {
       parsedAccountBalance = int.tryParse(rawBalance.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
     }
 
-    // F12: Mở rộng Regex nhận diện số tiền phủ hợp VietinBank, MoMo, VCB, TCB, TPBank, MBBank
     final regex = RegExp(
       r'(?:GD|PS|So tien|chuyen|tru|cong|thanh toan)?\s*([+-]?\d{1,3}(?:[.,]\d{3})+|[+-]?\d+)\s*(?:VND|đ|VNĐ|d|k\b)',
       caseSensitive: false,
@@ -316,7 +312,7 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // 1. Tự động khôi phục userId chuẩn xác nếu SharedPreferences trả về null trong Background Isolate
+    // N1: Khôi phục userId nếu SharedPreferences chưa có. Không tự ý tạo user 'user_auto' rác.
     if (userId == null) {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
@@ -335,8 +331,10 @@ class AutoTransactionService {
         }
       }
 
+      // N1: Nếu vẫn không tìm thấy người dùng nào trong DB -> Bỏ qua, không tạo user rác
       if (userId == null) {
-        userId = await DatabaseHelper.instance.registerUser('user_auto', 'AUTO_SECURE_PASS');
+        debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch vì chưa có người dùng nào trong CSDL.");
+        return;
       }
     }
 
@@ -425,6 +423,7 @@ class AutoTransactionService {
 
     onTransactionAdded.add(true);
 
+    // N3: Safe notification call
     try {
       String typeText = isExpense ? 'Chi tiêu' : 'Thu nhập';
       String formattedAmount = _formatMoney(amount);
@@ -477,7 +476,7 @@ void notificationCallbackHandle(NotificationEvent evt) async {
   AutoTransactionService.instance.handleNotificationEvent(evt);
 }
 
-// F2: Xử lý SMS ngầm khi ứng dụng chạy ẩn
+// N5: Sử dụng await trong backgroundMessageHandler
 @pragma('vm:entry-point')
 void backgroundMessageHandler(SmsMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -485,6 +484,6 @@ void backgroundMessageHandler(SmsMessage message) async {
     await Firebase.initializeApp();
   } catch (_) {}
   if (message.body != null && message.body!.isNotEmpty) {
-    AutoTransactionService.instance.processSmsContent(message.body!);
+    await AutoTransactionService.instance.processSmsContent(message.body!);
   }
 }

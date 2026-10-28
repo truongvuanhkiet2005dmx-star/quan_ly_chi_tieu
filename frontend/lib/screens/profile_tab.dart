@@ -247,7 +247,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: tempLanguage,
+                    initialValue: tempLanguage,
                     dropdownColor: AppColors.card,
                     style: const TextStyle(color: AppColors.textDark),
                     decoration: const InputDecoration(
@@ -268,7 +268,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: tempCurrency,
+                    initialValue: tempCurrency,
                     dropdownColor: AppColors.card,
                     style: const TextStyle(color: AppColors.textDark),
                     decoration: const InputDecoration(
@@ -428,7 +428,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   trailing: Switch(
                     value: _isReminderEnabled,
-                    activeThumbColor: AppColors.primary,
+                    activeTrackColor: AppColors.primary,
                     onChanged: _setReminder,
                   ),
                 ),
@@ -441,7 +441,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   trailing: Switch(
                     value: _isBiometricEnabled,
-                    activeThumbColor: AppColors.primary,
+                    activeTrackColor: AppColors.primary,
                     onChanged: _setBiometric,
                   ),
                 ),
