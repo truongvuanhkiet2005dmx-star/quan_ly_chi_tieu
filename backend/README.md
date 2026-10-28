@@ -43,7 +43,26 @@ Authorization: Bearer <Firebase ID token>
 - `GET /api/transactions`
 - `POST /api/transactions`
 
-Frontend web chạy từ origin khác có thể cấu hình origin trong `CorsOrigins`, ví dụ địa chỉ LAN thực tế của máy frontend. Flutter Android/iOS không dùng cấu hình CORS của trình duyệt.
+Frontend chạy trên Flutter Web phải cấu hình đúng origin xuất hiện trên thanh địa chỉ trình duyệt trong `CorsOrigins`, ví dụ:
+
+```json
+"CorsOrigins": [
+  "http://localhost:5104",
+  "http://localhost:3000",
+  "http://192.168.1.10:3000",
+  "https://localhost:7146"
+]
+```
+
+Có thể cấu hình bằng biến môi trường thay vì sửa file:
+
+```powershell
+$env:CorsOrigins__0 = "http://192.168.1.10:3000"
+$env:CorsOrigins__1 = "http://localhost:3000"
+dotnet run --launch-profile http
+```
+
+Thay `192.168.1.10` bằng IPv4 LAN thực tế của máy chạy Flutter Web. Flutter Android/iOS không bị giới hạn bởi CORS của trình duyệt.
 
 `OccurredAt` được chuẩn hóa về UTC trước khi lưu và kiểm tra giao dịch trùng. SQLite lưu dữ liệu tại `smartmoney.db`; backend chạy EF Core migrations khi khởi động và không xóa database để cập nhật schema.
 
