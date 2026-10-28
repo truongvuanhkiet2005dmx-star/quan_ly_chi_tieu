@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
+import '../services/sync_service.dart';
 import 'bill_scanner_screen.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -364,6 +365,7 @@ class _AddTransactionScreenState
     try {
       final db = await DatabaseHelper.instance.database;
 
+      int insertedId = 0;
       await db.transaction((txn) async {
         final fromWallet = await txn.query(
           'wallets',
@@ -392,7 +394,7 @@ class _AddTransactionScreenState
           );
         }
 
-        await txn.insert(
+        insertedId = await txn.insert(
           'transactions',
           {
             'userId': _userId,
@@ -404,9 +406,37 @@ class _AddTransactionScreenState
             'categoryName': _selectedCategory,
             'date': _selectedDate.toIso8601String(),
             'note': _note,
+            'isSynced': 0,
+            'eventId': 'tx_0',
           },
         );
+
+        await txn.update(
+          'transactions',
+          {'eventId': 'tx_$insertedId'},
+          where: 'id = ?',
+          whereArgs: [insertedId],
+        );
       });
+
+      // Thử đồng bộ sang C# backend ngay sau khi lưu SQLite
+      try {
+        final txData = {
+          'id': insertedId,
+          'eventId': 'tx_$insertedId',
+          'amount': amount,
+          'type': _tabIndex == 0 ? 'expense' : 'income',
+          'walletName': _selectedWallet,
+          'bankName': _selectedWallet,
+          'packageName': '',
+          'categoryName': _selectedCategory,
+          'date': _selectedDate.toIso8601String(),
+          'note': _note,
+        };
+        SyncService.instance.syncTransaction(txData);
+      } catch (e) {
+        debugPrint("Manual tx sync error: $e");
+      }
 
       if (!mounted) return;
 

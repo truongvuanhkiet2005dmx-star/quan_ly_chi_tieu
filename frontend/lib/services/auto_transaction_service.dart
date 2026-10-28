@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../database/database_helper.dart';
 import 'notification_service.dart';
+import 'sync_service.dart';
 
 class AutoTransactionService {
   static final AutoTransactionService instance = AutoTransactionService._();
@@ -31,13 +33,13 @@ class AutoTransactionService {
         );
       }
     } catch (e) {
-      print("Error initializing SMS listener: $e");
+      debugPrint("Error initializing SMS listener: $e");
     }
 
     try {
       bool? isGranted = await NotificationsListener.hasPermission;
       if (isGranted != true) {
-        print("Notification Listener Permission not granted. Opening settings...");
+        debugPrint("Notification Listener Permission not granted. Opening settings...");
         await NotificationsListener.openPermissionSettings();
       }
 
@@ -47,7 +49,7 @@ class AutoTransactionService {
         handleNotificationEvent(evt);
       });
     } catch (e) {
-      print("Error initializing Notification listener: $e");
+      debugPrint("Error initializing Notification listener: $e");
     }
   }
 
@@ -77,7 +79,7 @@ class AutoTransactionService {
 
     String fullContent = "$title\n$text\n$message".trim();
     if (fullContent.isNotEmpty) {
-      processSmsContent(fullContent);
+      processSmsContent(fullContent, packageName: pkg);
     }
   }
 
@@ -178,7 +180,7 @@ class AutoTransactionService {
     return wallets.first;
   }
 
-  Future<void> processSmsContent(String content, {bool force = false}) async {
+  Future<void> processSmsContent(String content, {bool force = false, String packageName = ''}) async {
     // 1. Bỏ qua thông báo của chính ứng dụng SmartMoney tạo ra (chống lặp)
     if (!force && (content.contains('SmartMoney') || content.contains('Chi tiêu tự động') || content.contains('Thu nhập tự động'))) {
       return;
@@ -203,7 +205,7 @@ class AutoTransactionService {
     // 2. Chống lặp thông báo trong khoảng thời gian 10 giây (Deduplication Cache)
     String cacheKey = content.trim();
     if (!force && _processedCache.contains(cacheKey)) {
-      print("Bỏ qua thông báo trùng lặp: $cacheKey");
+      debugPrint("Bỏ qua thông báo trùng lặp: $cacheKey");
       return;
     }
 
@@ -265,7 +267,7 @@ class AutoTransactionService {
                 lowerContent.contains('ck:-')
         );
 
-        await _saveAutoTransaction(amount, isExpense, content, parsedAccountBalance, extractedStk);
+        await _saveAutoTransaction(amount, isExpense, content, parsedAccountBalance, extractedStk, packageName: packageName);
       }
     }
   }
@@ -275,8 +277,9 @@ class AutoTransactionService {
       bool isExpense,
       String rawContent,
       int? parsedAccountBalance,
-      String? extractedStk,
-      ) async {
+      String? extractedStk, {
+        String packageName = '',
+      }) async {
     final prefs = await SharedPreferences.getInstance();
     int? userId = prefs.getInt('userId');
 
@@ -334,6 +337,7 @@ class AutoTransactionService {
       displayNote = ndMatch.group(1)?.trim() ?? rawContent;
     }
 
+    int insertedTxId = 0;
     int newBalance;
     await db.transaction((txn) async {
       if (parsedAccountBalance != null) {
@@ -349,7 +353,7 @@ class AutoTransactionService {
         whereArgs: [walletId],
       );
 
-      await txn.insert(
+      insertedTxId = await txn.insert(
         'transactions',
         {
           'userId': walletUserId,
@@ -361,7 +365,16 @@ class AutoTransactionService {
           'categoryName': isExpense ? 'Hóa đơn' : 'Tiền lương',
           'date': DateTime.now().toIso8601String(),
           'note': 'Auto: $displayNote',
+          'isSynced': 0,
+          'eventId': 'tx_0',
         },
+      );
+
+      await txn.update(
+        'transactions',
+        {'eventId': 'tx_$insertedTxId'},
+        where: 'id = ?',
+        whereArgs: [insertedTxId],
       );
     });
 
@@ -376,7 +389,26 @@ class AutoTransactionService {
         '$typeText +$formattedAmount đ tại ví "$walletName".',
       );
     } catch (e) {
-      print("Notification error: $e");
+      debugPrint("Notification error: $e");
+    }
+
+    // Thử đồng bộ sang C# backend ngay sau khi lưu SQLite
+    try {
+      final txData = {
+        'id': insertedTxId,
+        'eventId': 'tx_$insertedTxId',
+        'amount': amount,
+        'type': isExpense ? 'expense' : 'income',
+        'walletName': walletName,
+        'bankName': walletName,
+        'packageName': packageName,
+        'categoryName': isExpense ? 'Hóa đơn' : 'Tiền lương',
+        'date': DateTime.now().toIso8601String(),
+        'note': 'Auto: $displayNote',
+      };
+      await SyncService.instance.syncTransaction(txData);
+    } catch (e) {
+      debugPrint("Auto background sync error: $e");
     }
   }
 
@@ -396,10 +428,16 @@ class AutoTransactionService {
 @pragma('vm:entry-point')
 void notificationCallbackHandle(NotificationEvent evt) async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
   AutoTransactionService.instance.handleNotificationEvent(evt);
 }
 
 @pragma('vm:entry-point')
 void backgroundMessageHandler(SmsMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
 }

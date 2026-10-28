@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import 'register_screen.dart';
@@ -20,10 +21,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usernameController =
-  TextEditingController();
-  final TextEditingController _passwordController =
-  TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -62,6 +61,17 @@ class _LoginScreenState extends State<LoginScreen> {
           Colors.red,
         );
         return;
+      }
+
+      // Đăng nhập Firebase Auth ngầm (nếu có mạng & đã cấu hình Firebase)
+      try {
+        final email = username.contains('@') ? username : '$username@smartmoney.com';
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } catch (fe) {
+        debugPrint("[LoginScreen] Đăng nhập Firebase Auth chưa thành công (Chế độ Offline): $fe");
       }
 
       final prefs = await SharedPreferences.getInstance();

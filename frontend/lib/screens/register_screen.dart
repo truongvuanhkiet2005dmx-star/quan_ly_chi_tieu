@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import 'initial_wallet_setup_screen.dart';
@@ -50,6 +51,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         username,
         password,
       );
+
+      // Đăng ký Firebase Auth ngầm (nếu có mạng & đã cấu hình Firebase)
+      try {
+        final email = username.contains('@') ? username : '$username@smartmoney.com';
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } catch (fe) {
+        debugPrint("[RegisterScreen] Đăng ký Firebase Auth chưa thành công (Chế độ Offline): $fe");
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('userId', userId);

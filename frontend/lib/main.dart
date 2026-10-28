@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'core/app_colors.dart';
 import 'screens/welcome_setup_screen.dart';
@@ -12,21 +13,27 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("[main] Firebase chưa được cấu hình google-services.json hoặc bị lỗi: $e");
+  }
+
+  try {
     await initializeDateFormatting('vi_VN', null);
   } catch (e) {
-    print("Error initializing date formatting: $e");
+    debugPrint("Error initializing date formatting: $e");
   }
 
   try {
     await NotificationService.instance.initialize();
   } catch (e) {
-    print("Error initializing NotificationService: $e");
+    debugPrint("Error initializing NotificationService: $e");
   }
 
   try {
     AutoTransactionService.instance.initialize();
   } catch (e) {
-    print("Error initializing AutoTransactionService: $e");
+    debugPrint("Error initializing AutoTransactionService: $e");
   }
 
   runApp(const SmartMoneyApp());

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import '../services/auto_transaction_service.dart';
+import '../services/sync_service.dart';
 import 'sms_list_screen.dart';
 import 'calendar_tab.dart';
 
@@ -96,6 +97,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       _transactions = txs;
       _isLoading = false;
     });
+
+    // Tự động kiểm tra và đồng bộ lại các giao dịch chờ (isSynced = 0)
+    SyncService.instance.syncAllPendingTransactions(userId);
   }
 
   Future<void> _showManualSyncDialog() async {

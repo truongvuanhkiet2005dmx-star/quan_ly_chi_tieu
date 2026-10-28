@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -58,6 +58,8 @@ class DatabaseHelper {
         categoryName TEXT NOT NULL,
         date TEXT NOT NULL,
         note TEXT,
+        isSynced INTEGER NOT NULL DEFAULT 0,
+        eventId TEXT,
         FOREIGN KEY (userId) REFERENCES users(id),
         FOREIGN KEY (walletId) REFERENCES wallets(id),
         FOREIGN KEY (toWalletId) REFERENCES wallets(id)
@@ -135,6 +137,22 @@ class DatabaseHelper {
           FOREIGN KEY (userId) REFERENCES users(id)
         )
       ''');
+    }
+
+    if (oldVersion < 4) {
+      try {
+        await db.execute('''
+          ALTER TABLE transactions
+          ADD COLUMN isSynced INTEGER NOT NULL DEFAULT 0
+        ''');
+      } catch (_) {}
+
+      try {
+        await db.execute('''
+          ALTER TABLE transactions
+          ADD COLUMN eventId TEXT
+        ''');
+      } catch (_) {}
     }
   }
 
@@ -333,9 +351,41 @@ class DatabaseHelper {
       ) async {
     final db = await instance.database;
 
-    return await db.insert(
+    final id = await db.insert(
       'transactions',
       transaction,
+    );
+
+    if (transaction['eventId'] == null || transaction['eventId'].toString().isEmpty) {
+      final generatedEventId = 'tx_$id';
+      await db.update(
+        'transactions',
+        {'eventId': generatedEventId},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+
+    return id;
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedTransactions(int userId) async {
+    final db = await instance.database;
+    return await db.query(
+      'transactions',
+      where: 'userId = ? AND (isSynced IS NULL OR isSynced = 0)',
+      whereArgs: [userId],
+      orderBy: 'id ASC',
+    );
+  }
+
+  Future<void> markTransactionSynced(int id) async {
+    final db = await instance.database;
+    await db.update(
+      'transactions',
+      {'isSynced': 1},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 

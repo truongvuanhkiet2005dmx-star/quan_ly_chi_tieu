@@ -1,0 +1,95 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import '../database/database_helper.dart';
+
+class SyncService {
+  static final SyncService instance = SyncService._init();
+  SyncService._init();
+
+  static const String _backendBaseUrl = 'http://10.0.2.2:5104/api/transactions';
+
+  Future<void> syncTransaction(Map<String, dynamic> tx) async {
+    final txId = tx['id'] as int?;
+    final eventId = tx['eventId']?.toString().isNotEmpty == true
+        ? tx['eventId'].toString()
+        : (txId != null ? 'tx_$txId' : 'tx_${DateTime.now().millisecondsSinceEpoch}');
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint("[SyncService] Chưa đăng nhập Firebase Auth. Bỏ qua gửi API cho $eventId (giữ isSynced = 0).");
+        return;
+      }
+
+      final token = await user.getIdToken();
+      if (token == null || token.isEmpty) {
+        debugPrint("[SyncService] Không thể lấy Firebase ID Token. Bỏ qua gửi API cho $eventId.");
+        return;
+      }
+
+      final String type = (tx['type']?.toString().isNotEmpty == true)
+          ? tx['type'].toString()
+          : (tx['isExpense'] == 1 ? 'expense' : 'income');
+
+      final String source = tx['walletName']?.toString() ?? 'Ví tài khoản';
+      final String bankName = tx['bankName']?.toString() ?? source;
+      final String packageName = tx['packageName']?.toString() ?? '';
+      final String categoryName = tx['categoryName']?.toString() ?? 'Khác';
+      final String note = tx['note']?.toString() ?? '';
+      final String occurredAt = tx['date']?.toString().isNotEmpty == true
+          ? tx['date'].toString()
+          : DateTime.now().toIso8601String();
+      final int amount = (tx['amount'] as num?)?.toInt() ?? 0;
+
+      final bodyPayload = {
+        'eventId': eventId,
+        'amount': amount,
+        'type': type,
+        'source': source,
+        'bankName': bankName,
+        'packageName': packageName,
+        'occurredAt': occurredAt,
+        'categoryName': categoryName,
+        'note': note,
+      };
+
+      debugPrint("[SyncService] Gửi POST $_backendBaseUrl với eventId: $eventId...");
+
+      final response = await http.post(
+        Uri.parse(_backendBaseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(bodyPayload),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint("[SyncService] Đồng bộ thành công cho $eventId: ${response.body}");
+        if (txId != null) {
+          await DatabaseHelper.instance.markTransactionSynced(txId);
+        }
+      } else {
+        debugPrint("[SyncService] Lỗi API Status Code: ${response.statusCode}, Body: ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("[SyncService] Không thể gửi API đồng bộ (Mất mạng / Lỗi kết nối Backend): $e");
+    }
+  }
+
+  Future<void> syncAllPendingTransactions(int userId) async {
+    try {
+      final unsynced = await DatabaseHelper.instance.getUnsyncedTransactions(userId);
+      if (unsynced.isEmpty) return;
+
+      debugPrint("[SyncService] Phát hiện ${unsynced.length} giao dịch chờ đồng bộ cho userId $userId.");
+      for (var tx in unsynced) {
+        await syncTransaction(tx);
+      }
+    } catch (e) {
+      debugPrint("[SyncService] Lỗi khi duyệt danh sách đồng bộ chờ: $e");
+    }
+  }
+}
