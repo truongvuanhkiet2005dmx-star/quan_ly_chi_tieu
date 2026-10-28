@@ -33,6 +33,9 @@ frontend/**/ios/Flutter/.last_build_id
 frontend/**/*.symbolicated
 frontend/**/*.obfuscated
 
+# Firebase Credentials
+**/google-services.json
+
 # ASP.NET Core / C#
 backend/**/bin/
 backend/**/obj/

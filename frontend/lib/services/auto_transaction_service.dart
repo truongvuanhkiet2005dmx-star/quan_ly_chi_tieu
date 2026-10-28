@@ -15,11 +15,19 @@ class AutoTransactionService {
   static final AutoTransactionService instance = AutoTransactionService._();
   AutoTransactionService._();
 
+  static bool _initialized = false;
   final Telephony telephony = Telephony.instance;
   final StreamController<bool> onTransactionAdded = StreamController<bool>.broadcast();
   static final Set<String> _processedCache = {};
 
   void initialize() async {
+    // F4 Fix: Đảm bảo chỉ đăng ký SMS/Notification listener duy nhất 1 lần
+    if (_initialized) {
+      debugPrint("[AutoTransactionService] Dịch vụ đã được khởi tạo trước đó. Bỏ qua đăng ký lặp.");
+      return;
+    }
+    _initialized = true;
+
     try {
       Map<Permission, PermissionStatus> statuses = await [
         Permission.sms,
@@ -70,8 +78,13 @@ class AutoTransactionService {
       text = evt.text ?? '';
       message = evt.message ?? '';
 
-      // F2 Fix: Đọc bigText, subText, textLines từ evt.raw nếu evt thuộc kiểu NotificationEvent
-      if (evt.raw != null && evt.raw is Map) {
+      // F2 Fix: Đọc trực tiếp bigText, subText, textLines từ dynamic getter hoặc raw map
+      try {
+        bigText = (evt as dynamic).bigText?.toString() ?? '';
+        subText = (evt as dynamic).subText?.toString() ?? '';
+      } catch (_) {}
+
+      if (bigText.isEmpty && evt.raw != null && evt.raw is Map) {
         final rawMap = evt.raw as Map;
         bigText = (rawMap['bigText'] ?? rawMap['big_text'] ?? rawMap['android.bigText'] ?? '').toString();
         subText = (rawMap['subText'] ?? rawMap['sub_text'] ?? rawMap['android.subText'] ?? '').toString();
@@ -322,7 +335,7 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // F3 Fix: Bỏ hẳn việc tự động tạo tài khoản user_auto rác trong SQLite
+    // F3 Fix: Bỏ hẳn việc tạo tài khoản 'user_auto' rác
     if (userId == null) {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
@@ -341,7 +354,7 @@ class AutoTransactionService {
         }
       }
 
-      // F3 Fix: Nếu vẫn không tìm thấy người dùng nào trong CSDL -> Bỏ qua, không bao giờ tự tạo user_auto rác
+      // F3 Fix: Nếu vẫn không tìm thấy người dùng nào trong CSDL -> Bỏ qua, không tạo user_auto rác
       if (userId == null) {
         debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch tự động vì chưa có người dùng đăng nhập trong CSDL.");
         return;
@@ -433,7 +446,6 @@ class AutoTransactionService {
 
     onTransactionAdded.add(true);
 
-    // F4 Fix: Đảm bảo NotificationService khởi tạo đầy đủ trong Background Isolate trước khi phát notification
     try {
       String typeText = isExpense ? 'Chi tiêu' : 'Thu nhập';
       String formattedAmount = _formatMoney(amount);
@@ -481,7 +493,7 @@ class AutoTransactionService {
 void notificationCallbackHandle(NotificationEvent evt) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp().timeout(const Duration(seconds: 3));
   } catch (_) {}
   try {
     await NotificationService.instance.initializeForBackground();
@@ -493,7 +505,7 @@ void notificationCallbackHandle(NotificationEvent evt) async {
 void backgroundMessageHandler(SmsMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp().timeout(const Duration(seconds: 3));
   } catch (_) {}
   try {
     await NotificationService.instance.initializeForBackground();
