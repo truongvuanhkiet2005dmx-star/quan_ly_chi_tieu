@@ -1,11 +1,65 @@
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Backend_Nhom6_QuanLyChiTieu.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var firebaseProjectId = builder.Configuration["FIREBASE_PROJECT_ID"]
+    ?? builder.Configuration["Firebase:ProjectId"];
+
+if (string.IsNullOrWhiteSpace(firebaseProjectId))
+{
+    throw new InvalidOperationException(
+        "Thiếu cấu hình Firebase Project ID. Hãy đặt biến môi trường FIREBASE_PROJECT_ID hoặc cấu hình Firebase:ProjectId.");
+}
+
+firebaseProjectId = firebaseProjectId.Trim();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = $"https://securetoken.google.com/{firebaseProjectId}";
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
+            ValidateAudience = true,
+            ValidAudience = firebaseProjectId,
+            ValidateLifetime = true
+        };
+    });
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Nhập Firebase ID token theo dạng: Bearer <Firebase ID token>"
+    });
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=smartmoney.db"));
@@ -21,13 +75,45 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // Bổ sung cột cho database SQLite đã tồn tại mà không xóa hoặc tái tạo database.
+    var connection = db.Database.GetDbConnection();
+    connection.Open();
+    var hasUidColumn = false;
+    using (var command = connection.CreateCommand())
+    {
+        command.CommandText = "PRAGMA table_info(Transactions);";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.GetString(1).Equals("Uid", StringComparison.OrdinalIgnoreCase))
+            {
+                hasUidColumn = true;
+                break;
+            }
+        }
+    }
+
+    if (!hasUidColumn)
+    {
+        db.Database.ExecuteSqlRaw("ALTER TABLE Transactions ADD COLUMN Uid TEXT NULL;");
+    }
+
+    connection.Close();
+
+    db.Database.ExecuteSqlRaw(
+        "CREATE UNIQUE INDEX IF NOT EXISTS IX_Transactions_Uid_EventId ON Transactions (Uid, EventId);");
 }
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowAll");
+
+// BẮT BUỘC: Authentication phải nằm trước Authorization
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

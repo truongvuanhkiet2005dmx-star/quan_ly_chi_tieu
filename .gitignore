@@ -54,3 +54,6 @@ backend/**/appsettings.Local.json
 !.env.example
 **/*.pfx
 **/*.key
+backend/**/*.db
+backend/**/*.db-shm
+backend/**/*.db-wal
