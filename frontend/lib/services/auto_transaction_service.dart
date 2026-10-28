@@ -21,7 +21,7 @@ class AutoTransactionService {
   static final Set<String> _processedCache = {};
 
   void initialize() async {
-    // F4 Fix: Đảm bảo chỉ đăng ký SMS/Notification listener duy nhất 1 lần
+    // F1 Fix: Gán _initialized = true ngay lập tức TRƯỚC các câu lệnh await để chặn race-condition gọi lặp
     if (_initialized) {
       debugPrint("[AutoTransactionService] Dịch vụ đã được khởi tạo trước đó. Bỏ qua đăng ký lặp.");
       return;
@@ -78,7 +78,7 @@ class AutoTransactionService {
       text = evt.text ?? '';
       message = evt.message ?? '';
 
-      // F2 Fix: Đọc trực tiếp bigText, subText, textLines từ dynamic getter hoặc raw map
+      // F3/F2 Confirmation: Đọc trực tiếp bigText, subText, textLines từ dynamic getter hoặc raw map
       try {
         bigText = (evt as dynamic).bigText?.toString() ?? '';
         subText = (evt as dynamic).subText?.toString() ?? '';
@@ -335,7 +335,7 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // F3 Fix: Bỏ hẳn việc tạo tài khoản 'user_auto' rác
+    // F3 Confirmation: Khôi phục userId từ Firebase hoặc user gần nhất. Không tự tạo user_auto rác
     if (userId == null) {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
@@ -354,7 +354,7 @@ class AutoTransactionService {
         }
       }
 
-      // F3 Fix: Nếu vẫn không tìm thấy người dùng nào trong CSDL -> Bỏ qua, không tạo user_auto rác
+      // F3 Confirmation: Bỏ qua nếu chưa có user trong CSDL, tuyệt đối không tạo user_auto rác
       if (userId == null) {
         debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch tự động vì chưa có người dùng đăng nhập trong CSDL.");
         return;
