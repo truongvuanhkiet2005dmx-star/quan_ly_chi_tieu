@@ -6,13 +6,13 @@
 
 ## 🛠️ Yêu Cầu Cấu Hình Môi Trường (System Requirements)
 
-* **Flutter SDK**: `>= 3.24.0` (Khuyến nghị `3.27.0` trở lên)
-* **Dart SDK**: `>= 3.5.0`
-* **Android Studio**: Android SDK 34/35, Java 17
+* **Flutter SDK**: `>= 3.0.0`
+* **Dart SDK**: `>= 3.0.0 < 4.0.0`
+* **Android SDK**: `compileSdk = 34`, `targetSdk = 34` (Android 14/15)
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Ứng Dụng (Getting Started)
+## 🚀 Hướng Dẫn Chạy Trên Android Emulator & Điện Thoại Thật (Real Physical Device)
 
 1. **Cài đặt dependencies**:
    ```bash
@@ -23,10 +23,18 @@
    Đặt tệp `google-services.json` tải từ Firebase Console vào đường dẫn:
    `android/app/google-services.json`
 
-3. **Khởi chạy trên Android Emulator / Thiết bị thật**:
+3. **Chạy trên Android Emulator (Cổng mặc định 10.0.2.2)**:
    ```bash
    flutter run
    ```
+
+4. **Chạy trên Điện thoại thật (Physical Device) qua Mạng Wifi / IP LAN**:
+   > [!IMPORTANT]
+   > Điện thoại thật không thể sử dụng IP `10.0.2.2`. Bạn cần truyền IP LAN máy tính đang bật Backend C# bằng cờ `--dart-define`:
+   ```bash
+   flutter run --dart-define=BACKEND_URL=http://<IP_MÁY_TÍNH_CỦA_BẠN>:5104/api/transactions
+   ```
+   *(Ví dụ: `flutter run --dart-define=BACKEND_URL=http://192.168.1.15:5104/api/transactions`)*
 
 ---
 

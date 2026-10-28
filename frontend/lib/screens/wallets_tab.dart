@@ -14,8 +14,8 @@ class WalletsTab extends StatefulWidget {
 
 class _WalletsTabState extends State<WalletsTab> {
   int? _userId;
-  int _totalBalance = 0;
   List<Map<String, dynamic>> _wallets = [];
+  int _totalBalance = 0;
   bool _isLoading = true;
 
   StreamSubscription<bool>? _autoTxSub;
@@ -48,7 +48,7 @@ class _WalletsTabState extends State<WalletsTab> {
 
     int total = 0;
     for (final wallet in wallets) {
-      total += wallet['balance'] as int;
+      total += (wallet['balance'] as num?)?.toInt() ?? 0;
     }
 
     if (!mounted) return;
@@ -254,7 +254,7 @@ class _WalletsTabState extends State<WalletsTab> {
     final type = wallet['type']?.toString() ?? 'other';
     final icon = _getWalletIcon(type);
     final title = wallet['name']?.toString() ?? '';
-    final balance = _formatMoney(wallet['balance'] as int? ?? 0);
+    final balance = _formatMoney((wallet['balance'] as num?)?.toInt() ?? 0);
     final accountNumber = wallet['accountNumber']?.toString();
 
     return Container(
@@ -281,44 +281,35 @@ class _WalletsTabState extends State<WalletsTab> {
                   title,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textDark,
                     fontSize: 16,
+                    color: AppColors.textDark,
                   ),
                 ),
                 if (accountNumber != null && accountNumber.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     'STK: $accountNumber',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSub),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSub,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                balance,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 4),
-              GestureDetector(
-                onTap: () => _showEditWalletDialog(wallet),
-                child: const Text(
-                  'Sửa',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            balance,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: AppColors.textSub, size: 20),
+            onPressed: () => _showEditWalletDialog(wallet),
           ),
         ],
       ),
@@ -336,18 +327,10 @@ class _AddWalletDialog extends StatefulWidget {
 }
 
 class _AddWalletDialogState extends State<_AddWalletDialog> {
-  late TextEditingController _nameController;
-  late TextEditingController _balanceController;
-  late TextEditingController _accountNumberController;
+  final _nameController = TextEditingController();
+  final _balanceController = TextEditingController();
+  final _accountNumberController = TextEditingController();
   String _type = 'bank';
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _balanceController = TextEditingController();
-    _accountNumberController = TextEditingController();
-  }
 
   @override
   void dispose() {
@@ -361,7 +344,7 @@ class _AddWalletDialogState extends State<_AddWalletDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.card,
-      title: const Text('Thêm tài khoản / ví mới', style: TextStyle(color: AppColors.textDark)),
+      title: const Text('Thêm ví mới', style: TextStyle(color: AppColors.textDark)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -370,17 +353,7 @@ class _AddWalletDialogState extends State<_AddWalletDialog> {
               controller: _nameController,
               style: const TextStyle(color: AppColors.textDark),
               decoration: const InputDecoration(
-                labelText: 'Tên ví (VD: VietinBank, MB Bank, Tiền mặt)',
-                labelStyle: TextStyle(color: AppColors.textSub),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _accountNumberController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: AppColors.textDark),
-              decoration: const InputDecoration(
-                labelText: 'Số tài khoản (Để ghép nối SMS)',
+                labelText: 'Tên ví (Ví dụ: VietinBank, MoMo...)',
                 labelStyle: TextStyle(color: AppColors.textSub),
               ),
             ),
@@ -393,8 +366,35 @@ class _AddWalletDialogState extends State<_AddWalletDialog> {
                 labelText: 'Số dư ban đầu',
                 labelStyle: TextStyle(color: AppColors.textSub),
                 suffixText: 'VNĐ',
-                suffixStyle: TextStyle(color: AppColors.textSub),
               ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _accountNumberController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Số tài khoản / STK (nếu có)',
+                labelStyle: TextStyle(color: AppColors.textSub),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _type,
+              dropdownColor: AppColors.card,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Loại tài khoản',
+                labelStyle: TextStyle(color: AppColors.textSub),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'bank', child: Text('Tài khoản Ngân hàng')),
+                DropdownMenuItem(value: 'cash', child: Text('Ví Tiền mặt')),
+                DropdownMenuItem(value: 'other', child: Text('Khác')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _type = val);
+              },
             ),
           ],
         ),
@@ -408,8 +408,9 @@ class _AddWalletDialogState extends State<_AddWalletDialog> {
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
           onPressed: () async {
             final name = _nameController.text.trim();
+            final balanceText = _balanceController.text.replaceAll(',', '').replaceAll('.', '').trim();
+            final balance = int.tryParse(balanceText) ?? 0;
             final accNum = _accountNumberController.text.trim();
-            final balance = int.tryParse(_balanceController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
 
             if (name.isEmpty) return;
 
@@ -424,7 +425,7 @@ class _AddWalletDialogState extends State<_AddWalletDialog> {
             if (!mounted) return;
             Navigator.pop(context, true);
           },
-          child: const Text('Thêm ví', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          child: const Text('Lưu', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -444,13 +445,15 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
   late TextEditingController _nameController;
   late TextEditingController _balanceController;
   late TextEditingController _accountNumberController;
+  late String _type;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.wallet['name']?.toString() ?? '');
-    _balanceController = TextEditingController(text: widget.wallet['balance']?.toString() ?? '0');
+    _balanceController = TextEditingController(text: (widget.wallet['balance'] as num?)?.toInt().toString() ?? '0');
     _accountNumberController = TextEditingController(text: widget.wallet['accountNumber']?.toString() ?? '');
+    _type = widget.wallet['type']?.toString() ?? 'bank';
   }
 
   @override
@@ -467,7 +470,7 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
 
     return AlertDialog(
       backgroundColor: AppColors.card,
-      title: const Text('Chỉnh sửa ví / STK', style: TextStyle(color: AppColors.textDark)),
+      title: const Text('Chỉnh sửa ví', style: TextStyle(color: AppColors.textDark)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -475,21 +478,49 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
             TextField(
               controller: _nameController,
               style: const TextStyle(color: AppColors.textDark),
-              decoration: const InputDecoration(labelText: 'Tên ví', labelStyle: TextStyle(color: AppColors.textSub)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _accountNumberController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: AppColors.textDark),
-              decoration: const InputDecoration(labelText: 'Số tài khoản / STK', labelStyle: TextStyle(color: AppColors.textSub)),
+              decoration: const InputDecoration(
+                labelText: 'Tên ví',
+                labelStyle: TextStyle(color: AppColors.textSub),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _balanceController,
               keyboardType: TextInputType.number,
               style: const TextStyle(color: AppColors.textDark),
-              decoration: const InputDecoration(labelText: 'Số dư hiện tại', labelStyle: TextStyle(color: AppColors.textSub), suffixText: 'VNĐ'),
+              decoration: const InputDecoration(
+                labelText: 'Số dư hiện tại',
+                labelStyle: TextStyle(color: AppColors.textSub),
+                suffixText: 'VNĐ',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _accountNumberController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Số tài khoản / STK',
+                labelStyle: TextStyle(color: AppColors.textSub),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _type,
+              dropdownColor: AppColors.card,
+              style: const TextStyle(color: AppColors.textDark),
+              decoration: const InputDecoration(
+                labelText: 'Loại tài khoản',
+                labelStyle: TextStyle(color: AppColors.textSub),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'bank', child: Text('Tài khoản Ngân hàng')),
+                DropdownMenuItem(value: 'cash', child: Text('Ví Tiền mặt')),
+                DropdownMenuItem(value: 'other', child: Text('Khác')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _type = val);
+              },
             ),
           ],
         ),
@@ -497,56 +528,33 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
       actions: [
         TextButton(
           onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                backgroundColor: AppColors.card,
-                title: const Text('Xác nhận xóa ví', style: TextStyle(color: AppColors.textDark)),
-                content: Text(
-                  'Bạn có chắc chắn muốn xóa ví "${widget.wallet['name']}" không? Mọi lịch sử giao dịch thuộc ví này sẽ bị xóa khỏi cơ sở dữ liệu SQLite.',
-                  style: const TextStyle(color: AppColors.textSub),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Hủy', style: TextStyle(color: AppColors.textSub)),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Xóa vĩnh viễn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-
-            if (confirm == true) {
-              await DatabaseHelper.instance.deleteWallet(walletId);
-              if (!mounted) return;
-              Navigator.pop(context, true);
-            }
+            await DatabaseHelper.instance.deleteWallet(walletId);
+            if (!mounted) return;
+            Navigator.pop(context, true);
           },
-          child: const Text('Xóa ví', style: TextStyle(color: Colors.redAccent)),
+          child: const Text('Xóa ví này', style: TextStyle(color: Colors.redAccent)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
           onPressed: () async {
             final name = _nameController.text.trim();
+            final balanceText = _balanceController.text.replaceAll(',', '').replaceAll('.', '').trim();
+            final balance = int.tryParse(balanceText) ?? 0;
             final accNum = _accountNumberController.text.trim();
-            final balance = int.tryParse(_balanceController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
 
             if (name.isEmpty) return;
 
             await DatabaseHelper.instance.updateWallet(walletId, {
               'name': name,
               'balance': balance,
+              'type': _type,
               'accountNumber': accNum.isEmpty ? null : accNum,
             });
 
             if (!mounted) return;
             Navigator.pop(context, true);
           },
-          child: const Text('Lưu', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          child: const Text('Lưu thay đổi', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         ),
       ],
     );

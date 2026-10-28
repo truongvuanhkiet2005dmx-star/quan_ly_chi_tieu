@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import '../services/auto_transaction_service.dart';
@@ -19,6 +20,7 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   bool _isLoading = true;
+  bool _hasNotificationPermission = true;
   int _totalBalance = 0;
   int _totalIncome = 0;
   int _totalExpense = 0;
@@ -59,10 +61,19 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       _isLoading = true;
     });
 
+    try {
+      bool? isGranted = await NotificationsListener.hasPermission;
+      if (mounted) {
+        setState(() {
+          _hasNotificationPermission = isGranted == true;
+        });
+      }
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
 
-    // F6: Nếu chưa đăng nhập (userId == null), điều hướng về màn hình Welcome thay vì fallback user 1
+    // F6: Điều hướng về Welcome/Login nếu chưa có userId trong SharedPreferences
     if (userId == null) {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -76,7 +87,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final wallets = await DatabaseHelper.instance.getWallets(userId);
     int balance = 0;
     for (var w in wallets) {
-      balance += (w['balance'] as int? ?? 0);
+      balance += ((w['balance'] as num?)?.toInt() ?? 0);
     }
 
     final db = await DatabaseHelper.instance.database;
@@ -91,7 +102,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     int income = 0;
     int expense = 0;
     for (var t in txs) {
-      final amt = t['amount'] as int? ?? 0;
+      final amt = (t['amount'] as num?)?.toInt() ?? 0;
       final isExp = t['isExpense'] == 1;
       if (isExp) {
         expense += amt;
@@ -112,6 +123,45 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
     // Tự động kiểm tra và đồng bộ lại các giao dịch chờ (isSynced = 0)
     SyncService.instance.syncAllPendingTransactions(userId);
+  }
+
+  Widget _buildNotificationPermissionBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade900.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amberAccent),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active, color: Colors.amberAccent, size: 24),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cấp quyền đọc thông báo ngân hàng', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(height: 2),
+                Text('Bật quyền để ứng dụng tự động bóc tách biến động số dư VietinBank, MoMo...', style: TextStyle(color: AppColors.textDark, fontSize: 11)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amberAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            ),
+            onPressed: () async {
+              await NotificationsListener.openPermissionSettings();
+              _loadHomeData();
+            },
+            child: const Text('Bật ngay', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showManualSyncDialog() async {
@@ -307,6 +357,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // F10: Hiển thị banner nhắc cấp quyền đọc thông báo ngân hàng nếu người dùng máy thật chưa bật
+                if (!_hasNotificationPermission) _buildNotificationPermissionBanner(),
+
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   color: AppColors.surface,
@@ -406,7 +459,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       itemBuilder: (context, index) {
                         final tx = filteredTransactions[index];
                         final isExp = tx['isExpense'] == 1;
-                        final amount = tx['amount'] as int;
+                        // F14: Safe num casting
+                        final amount = (tx['amount'] as num?)?.toInt() ?? 0;
                         final category = (tx['categoryName'] ?? 'Khác').toString();
                         final note = (tx['note'] ?? '').toString();
 

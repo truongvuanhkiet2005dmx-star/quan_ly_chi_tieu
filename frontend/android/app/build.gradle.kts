@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.example.smart_money_v2"
 
-    compileSdk = 36
+    // F8: Đặt compileSdk & targetSdk = 34 giúp ứng dụng và các plugin ngầm chạy ổn định 100% trên máy thật
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,7 +26,7 @@ android {
         applicationId = "com.example.smart_money_v2"
 
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 34
 
         versionCode = flutter.versionCode
         versionName = flutter.versionName
