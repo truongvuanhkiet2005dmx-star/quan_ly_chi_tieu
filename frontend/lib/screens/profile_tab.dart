@@ -85,7 +85,6 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _logout() async {
-    // F10 Fix: Đăng xuất triệt để cả phiên Firebase Auth lẫn Google Sign-In
     try {
       await FirebaseAuth.instance.signOut();
     } catch (_) {}
@@ -112,8 +111,6 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   void _showCategoryManagementSheet() {
-    final categoryController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
@@ -121,60 +118,12 @@ class _ProfileTabState extends State<ProfileTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Quản lý Danh mục Thu / Chi', style: TextStyle(color: AppColors.textDark, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _customCategories.map((cat) {
-                      return Chip(
-                        backgroundColor: AppColors.surface,
-                        side: const BorderSide(color: AppColors.border),
-                        label: Text(cat, style: const TextStyle(color: AppColors.textDark)),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: categoryController,
-                          style: const TextStyle(color: AppColors.textDark),
-                          decoration: const InputDecoration(
-                            hintText: 'Nhập danh mục mới...',
-                            hintStyle: TextStyle(color: AppColors.textSub),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                        onPressed: () {
-                          final text = categoryController.text.trim();
-                          if (text.isNotEmpty) {
-                            setState(() {
-                              _customCategories.add(text);
-                            });
-                            setSheetState(() {});
-                            categoryController.clear();
-                          }
-                        },
-                        child: const Text('Thêm', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
+        return _CategoryManagementModal(
+          categories: _customCategories,
+          onCategoryAdded: (newCat) {
+            setState(() {
+              _customCategories.add(newCat);
+            });
           },
         );
       },
@@ -182,9 +131,6 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   void _showFamilyWalletSheet() {
-    final emailController = TextEditingController();
-    final budgetController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
@@ -192,51 +138,13 @@ class _ProfileTabState extends State<ProfileTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Quản lý Ví Gia Đình', style: TextStyle(color: AppColors.textDark, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Chia sẻ hạn mức thu chi và theo dõi ngân sách cùng thành viên gia đình.', style: TextStyle(color: AppColors.textSub, fontSize: 12)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: budgetController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: AppColors.textDark),
-                decoration: const InputDecoration(
-                  labelText: 'Hạn mức ngân sách tháng (VNĐ)',
-                  labelStyle: TextStyle(color: AppColors.textSub),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: AppColors.textDark),
-                decoration: const InputDecoration(
-                  labelText: 'SĐT hoặc Email người thân cần chia sẻ',
-                  labelStyle: TextStyle(color: AppColors.textSub),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã thiết lập Ví Gia Đình thành công!'), backgroundColor: Colors.green),
-                    );
-                  },
-                  child: const Text('Lưu thiết lập Ví Gia Đình', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
+        return _FamilyWalletModal(
+          onSaved: () {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đã thiết lập Ví Gia Đình thành công!'), backgroundColor: Colors.green),
+            );
+          },
         );
       },
     );
@@ -529,6 +437,152 @@ class _ProfileTabState extends State<ProfileTab> {
       thickness: 0.5,
       indent: 52,
       color: AppColors.border,
+    );
+  }
+}
+
+// F14 Fix: StatefulWidget có dispose() giải phóng TextEditingController chống memory leak
+class _CategoryManagementModal extends StatefulWidget {
+  final List<String> categories;
+  final Function(String) onCategoryAdded;
+
+  const _CategoryManagementModal({
+    required this.categories,
+    required this.onCategoryAdded,
+  });
+
+  @override
+  State<_CategoryManagementModal> createState() => _CategoryManagementModalState();
+}
+
+class _CategoryManagementModalState extends State<_CategoryManagementModal> {
+  final _categoryController = TextEditingController();
+
+  @override
+  void dispose() {
+    _categoryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Quản lý Danh mục Thu / Chi', style: TextStyle(color: AppColors.textDark, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.categories.map((cat) {
+              return Chip(
+                backgroundColor: AppColors.surface,
+                side: const BorderSide(color: AppColors.border),
+                label: Text(cat, style: const TextStyle(color: AppColors.textDark)),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _categoryController,
+                  style: const TextStyle(color: AppColors.textDark),
+                  decoration: const InputDecoration(
+                    hintText: 'Nhập danh mục mới...',
+                    hintStyle: TextStyle(color: AppColors.textSub),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                onPressed: () {
+                  final text = _categoryController.text.trim();
+                  if (text.isNotEmpty) {
+                    widget.onCategoryAdded(text);
+                    setState(() {});
+                    _categoryController.clear();
+                  }
+                },
+                child: const Text('Thêm', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FamilyWalletModal extends StatefulWidget {
+  final VoidCallback onSaved;
+
+  const _FamilyWalletModal({required this.onSaved});
+
+  @override
+  State<_FamilyWalletModal> createState() => _FamilyWalletModalState();
+}
+
+class _FamilyWalletModalState extends State<_FamilyWalletModal> {
+  final _emailController = TextEditingController();
+  final _budgetController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _budgetController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Quản lý Ví Gia Đình', style: TextStyle(color: AppColors.textDark, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Chia sẻ hạn mức thu chi và theo dõi ngân sách cùng thành viên gia đình.', style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _budgetController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(color: AppColors.textDark),
+            decoration: const InputDecoration(
+              labelText: 'Hạn mức ngân sách tháng (VNĐ)',
+              labelStyle: TextStyle(color: AppColors.textSub),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            style: const TextStyle(color: AppColors.textDark),
+            decoration: const InputDecoration(
+              labelText: 'SĐT hoặc Email người thân cần chia sẻ',
+              labelStyle: TextStyle(color: AppColors.textSub),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onSaved();
+              },
+              child: const Text('Lưu thiết lập Ví Gia Đình', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

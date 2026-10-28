@@ -26,6 +26,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   int _totalExpense = 0;
   List<Map<String, dynamic>> _transactions = [];
   String _selectedFilter = 'Tất cả';
+  DateTime? _lastLoadTime;
 
   StreamSubscription<bool>? _autoTxSub;
 
@@ -52,11 +53,17 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // F15 Fix: Throttle 5s tránh gọi DB/Permission lặp lại liên tục khi app resume
+      if (_lastLoadTime != null && DateTime.now().difference(_lastLoadTime!) < const Duration(seconds: 5)) {
+        return;
+      }
       _loadHomeData();
     }
   }
 
   Future<void> _loadHomeData() async {
+    _lastLoadTime = DateTime.now();
+
     setState(() {
       _isLoading = true;
     });
@@ -73,7 +80,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
 
-    // F6: Điều hướng về Welcome/Login nếu chưa có userId trong SharedPreferences
     if (userId == null) {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -90,6 +96,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       balance += ((w['balance'] as num?)?.toInt() ?? 0);
     }
 
+    // F3 Fix: Tính tổng thu/chi trực tiếp từ CSDL không phụ thuộc limit danh sách 50 giao dịch
+    final totalIncome = await DatabaseHelper.instance.getTotalIncome(userId);
+    final totalExpense = await DatabaseHelper.instance.getTotalExpense(userId);
+
     final db = await DatabaseHelper.instance.database;
     final txs = await db.query(
       'transactions',
@@ -99,29 +109,16 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       limit: 50,
     );
 
-    int income = 0;
-    int expense = 0;
-    for (var t in txs) {
-      final amt = (t['amount'] as num?)?.toInt() ?? 0;
-      final isExp = t['isExpense'] == 1;
-      if (isExp) {
-        expense += amt;
-      } else {
-        income += amt;
-      }
-    }
-
     if (!mounted) return;
 
     setState(() {
       _totalBalance = balance;
-      _totalIncome = income;
-      _totalExpense = expense;
+      _totalIncome = totalIncome;
+      _totalExpense = totalExpense;
       _transactions = txs;
       _isLoading = false;
     });
 
-    // Tự động kiểm tra và đồng bộ lại các giao dịch chờ (isSynced = 0)
     SyncService.instance.syncAllPendingTransactions(userId);
   }
 
@@ -357,7 +354,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // F10: Hiển thị banner nhắc cấp quyền đọc thông báo ngân hàng nếu người dùng máy thật chưa bật
                 if (!_hasNotificationPermission) _buildNotificationPermissionBanner(),
 
                 Container(
@@ -459,7 +455,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       itemBuilder: (context, index) {
                         final tx = filteredTransactions[index];
                         final isExp = tx['isExpense'] == 1;
-                        // F14: Safe num casting
                         final amount = (tx['amount'] as num?)?.toInt() ?? 0;
                         final category = (tx['categoryName'] ?? 'Khác').toString();
                         final note = (tx['note'] ?? '').toString();

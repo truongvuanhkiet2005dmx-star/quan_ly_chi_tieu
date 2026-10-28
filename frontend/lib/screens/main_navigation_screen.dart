@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/app_colors.dart';
+import '../core/voice_parser_util.dart';
 import '../services/auto_transaction_service.dart';
 import 'home_tab.dart';
 import 'reports_tab.dart';
@@ -99,92 +100,11 @@ class _MainNavigationScreenState
   }
 
   Map<String, String> _parseVoiceText(String text) {
-    if (text.isEmpty) return {'amount': '0', 'note': ''};
-
-    String lower = text.toLowerCase();
-    int amount = 0;
-
-    final kRegex = RegExp(r'(\d+)\s*k\b', caseSensitive: false);
-    final kMatch = kRegex.firstMatch(lower);
-    if (kMatch != null) {
-      int base = int.tryParse(kMatch.group(1) ?? '0') ?? 0;
-      amount = base * 1000;
-    }
-
-    if (amount == 0) {
-      final trieuRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*triệu', caseSensitive: false);
-      final trieuMatch = trieuRegex.firstMatch(lower);
-      if (trieuMatch != null) {
-        double base = double.tryParse(trieuMatch.group(1)?.replaceAll(',', '.') ?? '0') ?? 0;
-        amount = (base * 1000000).round();
-      }
-    }
-
-    if (amount == 0) {
-      final digitRegex = RegExp(r'(\d{4,10})');
-      final digitMatch = digitRegex.firstMatch(lower);
-      if (digitMatch != null) {
-        amount = int.tryParse(digitMatch.group(1) ?? '0') ?? 0;
-      }
-    }
-
-    if (amount == 0) {
-      if (lower.contains('ngàn') || lower.contains('nghìn')) {
-        int baseMultiplier = 1000;
-        if (lower.contains('một trăm') || lower.contains('trăm')) {
-          baseMultiplier = 100000;
-        } else if (lower.contains('hai trăm')) {
-          baseMultiplier = 200000;
-        } else if (lower.contains('ba trăm')) {
-          baseMultiplier = 300000;
-        } else if (lower.contains('bốn trăm')) {
-          baseMultiplier = 400000;
-        } else if (lower.contains('năm trăm')) {
-          baseMultiplier = 500000;
-        } else if (lower.contains('sáu trăm')) {
-          baseMultiplier = 600000;
-        } else if (lower.contains('bảy trăm')) {
-          baseMultiplier = 700000;
-        } else if (lower.contains('tám trăm')) {
-          baseMultiplier = 800000;
-        } else if (lower.contains('chín trăm')) {
-          baseMultiplier = 900000;
-        } else if (lower.contains('chín mươi')) {
-          baseMultiplier = 90000;
-        } else if (lower.contains('tám mươi')) {
-          baseMultiplier = 80000;
-        } else if (lower.contains('bảy mươi')) {
-          baseMultiplier = 70000;
-        } else if (lower.contains('sáu mươi')) {
-          baseMultiplier = 60000;
-        } else if (lower.contains('năm mươi')) {
-          baseMultiplier = 50000;
-        } else if (lower.contains('bốn mươi')) {
-          baseMultiplier = 40000;
-        } else if (lower.contains('ba mươi')) {
-          baseMultiplier = 30000;
-        } else if (lower.contains('hai mươi')) {
-          baseMultiplier = 20000;
-        } else if (lower.contains('mười')) {
-          baseMultiplier = 10000;
-        } else if (lower.contains('năm')) {
-          baseMultiplier = 5000;
-        }
-
-        amount = baseMultiplier;
-      }
-    }
-
-    String note = text
-        .replaceAll(RegExp(r'\b\d+\s*k\b', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*triệu\b', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\b\d{4,10}\b'), '')
-        .replaceAll(RegExp(r'\b(ba|năm|hai|bốn|sáu|bảy|tám|chín)?\s*(mươi|trăm)?\s*(ngàn|nghìn|đồng|vnd|vnđ)\b', caseSensitive: false), '')
-        .trim();
-
+    final parsed = VoiceParserUtil.parseVoiceInput(text);
+    final amountInt = parsed['amount'] as int? ?? 0;
     return {
-      'amount': amount > 0 ? amount.toString() : '0',
-      'note': note.isNotEmpty ? note : text,
+      'amount': amountInt > 0 ? amountInt.toString() : '0',
+      'note': parsed['note']?.toString() ?? text,
     };
   }
 
@@ -592,8 +512,6 @@ class _MainNavigationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
-      // F7 Fix: Dùng IndexedStack để giữ nguyên trạng thái scroll & filter của cả 4 tab
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,

@@ -148,7 +148,7 @@ class _AddTransactionScreenState
 
     if (key == '000') {
       setState(() {
-        if (_amount != '0' && _amount.length < 13) {
+        if (_amount != '0' && _amount.length <= 9) {
           _amount += '000';
         }
       });
@@ -168,7 +168,7 @@ class _AddTransactionScreenState
     setState(() {
       if (_amount == '0') {
         _amount = key;
-      } else if (_amount.length < 13) {
+      } else if (_amount.length < 12) {
         _amount += key;
       }
     });

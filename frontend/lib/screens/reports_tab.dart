@@ -57,6 +57,10 @@ class _ReportsTabState extends State<ReportsTab> {
     final Map<String, int> categories = {};
 
     for (final tx in transactions) {
+      final type = tx['type']?.toString();
+      // F11 Fix: Loại trừ giao dịch chuyển khoản khỏi báo cáo Thu/Chi
+      if (type == 'transfer') continue;
+
       final isExpense = tx['isExpense'] == 1;
       if (_modeIndex == 0 && !isExpense) continue;
       if (_modeIndex == 1 && isExpense) continue;
@@ -65,7 +69,6 @@ class _ReportsTabState extends State<ReportsTab> {
       if (date == null) continue;
 
       if (date.year == now.year && date.month == _selectedMonth) {
-        // F2 Fix: Safe num casting
         final amount = (tx['amount'] as num?)?.toInt() ?? 0;
         final category = tx['categoryName'].toString();
 
@@ -243,7 +246,8 @@ class _ReportsTabState extends State<ReportsTab> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: [3, 4, 5, 6, 7, 8, 9, 10].map((m) {
+                    // F2 Fix: Tạo động đủ 12 tháng từ 1 đến 12
+                    children: List.generate(12, (i) => i + 1).map((m) {
                       final isSelected = m == _selectedMonth;
                       return GestureDetector(
                         onTap: () {
