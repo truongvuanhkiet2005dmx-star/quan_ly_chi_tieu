@@ -37,7 +37,6 @@ class _MainNavigationScreenState
     AutoTransactionService.instance.initialize();
   }
 
-  // F1 Fix: Bỏ _refreshKey hoàn toàn, giữ 4 tab hằng số để không bao giờ bị dispose/recreate
   List<Widget> get _screens => const [
     HomeTab(),
     ReportsTab(),
@@ -403,7 +402,12 @@ class _MainNavigationScreenState
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // F5 Fix: Tự động dừng microphone ngay khi người dùng đóng thoại voice input
+      if (_isListening) {
+        _stopVoiceInput();
+      }
+    });
   }
 
   Widget _buildNavItem({

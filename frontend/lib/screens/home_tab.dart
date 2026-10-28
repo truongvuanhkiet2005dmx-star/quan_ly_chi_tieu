@@ -95,8 +95,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       balance += ((w['balance'] as num?)?.toInt() ?? 0);
     }
 
-    final totalIncome = await DatabaseHelper.instance.getTotalIncome(userId);
-    final totalExpense = await DatabaseHelper.instance.getTotalExpense(userId);
+    // F4 Fix: Lọc tổng Thu nhập và Chi tiêu chính xác theo Tháng & Năm cho Header "Thg X"
+    final now = DateTime.now();
+    final totalIncome = await DatabaseHelper.instance.getMonthIncome(userId, now.year, now.month);
+    final totalExpense = await DatabaseHelper.instance.getMonthExpense(userId, now.year, now.month);
 
     final db = await DatabaseHelper.instance.database;
     final txs = await db.query(

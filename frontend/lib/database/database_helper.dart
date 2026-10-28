@@ -254,7 +254,6 @@ class DatabaseHelper {
     final storedSalt = user['salt']?.toString();
     final userId = user['id'] as int;
 
-    // 1. Nếu đã có Salt, kiểm tra bằng PBKDF2-HMAC-SHA256
     if (storedSalt != null && storedSalt.isNotEmpty && storedPassword != null) {
       final hashedCandidate = pbkdf2HmacSha256(password, storedSalt);
       if (hashedCandidate == storedPassword) {
@@ -262,10 +261,8 @@ class DatabaseHelper {
       }
     }
 
-    // 2. Migration an toàn cho tài khoản cũ (Mật khẩu thô hoặc SHA-256 đơn thuần)
     final sha256Candidate = sha256.convert(utf8.encode(password)).toString();
     if (storedPassword == password || storedPassword == sha256Candidate) {
-      // Đăng nhập thành công -> Sinh Salt mới và nâng cấp mật khẩu sang chuẩn PBKDF2
       final newSalt = generateRandomSalt();
       final newHashedPassword = pbkdf2HmacSha256(password, newSalt);
 
@@ -293,7 +290,6 @@ class DatabaseHelper {
   }) async {
     final db = await instance.database;
 
-    // 1. Tra cứu theo firebaseUid
     var result = await db.query(
       'users',
       where: 'firebaseUid = ?',
@@ -304,7 +300,6 @@ class DatabaseHelper {
     int userId;
     if (result.isNotEmpty) {
       userId = result.first['id'] as int;
-      // Cập nhật lại email/username nếu có thay đổi từ Firebase
       if (result.first['username'] != email) {
         await db.update(
           'users',
@@ -314,7 +309,6 @@ class DatabaseHelper {
         );
       }
     } else {
-      // 2. Nếu chưa tìm thấy theo firebaseUid, kiểm tra theo email
       final emailResult = await db.query(
         'users',
         where: 'username = ?',
@@ -324,7 +318,6 @@ class DatabaseHelper {
 
       if (emailResult.isNotEmpty) {
         userId = emailResult.first['id'] as int;
-        // Liên kết firebaseUid cho tài khoản cũ
         await db.update(
           'users',
           {'firebaseUid': firebaseUid},
@@ -332,7 +325,6 @@ class DatabaseHelper {
           whereArgs: [userId],
         );
       } else {
-        // 3. Tạo tài khoản người dùng mới hoàn toàn cho Google / Firebase User (Không cần mật khẩu)
         userId = await db.insert('users', {
           'username': email,
           'firebaseUid': firebaseUid,
@@ -649,6 +641,40 @@ class DatabaseHelper {
       WHERE userId = ?
       AND type = 'expense'
     ''', [userId]);
+
+    return (result.first['total'] as int?) ?? 0;
+  }
+
+  // F4 Fix: Hàm tính tổng Thu nhập lọc chính xác theo Tháng & Năm
+  Future<int> getMonthIncome(int userId, int year, int month) async {
+    final db = await instance.database;
+    final monthStr = month < 10 ? '0$month' : '$month';
+    final pattern = '$year-$monthStr%';
+
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) AS total
+      FROM transactions
+      WHERE userId = ?
+      AND type = 'income'
+      AND date LIKE ?
+    ''', [userId, pattern]);
+
+    return (result.first['total'] as int?) ?? 0;
+  }
+
+  // F4 Fix: Hàm tính tổng Chi tiêu lọc chính xác theo Tháng & Năm
+  Future<int> getMonthExpense(int userId, int year, int month) async {
+    final db = await instance.database;
+    final monthStr = month < 10 ? '0$month' : '$month';
+    final pattern = '$year-$monthStr%';
+
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) AS total
+      FROM transactions
+      WHERE userId = ?
+      AND type = 'expense'
+      AND date LIKE ?
+    ''', [userId, pattern]);
 
     return (result.first['total'] as int?) ?? 0;
   }
