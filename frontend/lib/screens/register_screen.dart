@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import 'initial_wallet_setup_screen.dart';
+import 'main_navigation_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -47,20 +49,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
+      User? fbUser;
+
+      // 1. Thử đăng ký Firebase Auth nếu là email hợp lệ
+      if (username.contains('@')) {
+        try {
+          final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: username,
+            password: password,
+          );
+          fbUser = cred.user;
+        } on FirebaseAuthException catch (fe) {
+          if (fe.code == 'email-already-in-use') {
+            if (!mounted) return;
+            setState(() { _isLoading = false; });
+            _showSnackBar('Email này đã được đăng ký trên Firebase!', Colors.red);
+            return;
+          } else if (fe.code == 'weak-password') {
+            if (!mounted) return;
+            setState(() { _isLoading = false; });
+            _showSnackBar('Mật khẩu quá yếu!', Colors.red);
+            return;
+          } else if (fe.code == 'network-request-failed') {
+            debugPrint("[RegisterScreen] Mất mạng. Tiếp tục đăng ký SQLite Cục bộ...");
+          }
+        } catch (fe) {
+          debugPrint("[RegisterScreen] Lỗi kết nối Firebase Auth (Chế độ Offline): $fe");
+        }
+      }
+
+      // 2. Đăng ký CSDL SQLite cục bộ (mã hóa PBKDF2-HMAC-SHA256)
       final userId = await DatabaseHelper.instance.registerUser(
         username,
         password,
       );
 
-      // Đăng ký Firebase Auth ngầm (nếu có mạng & đã cấu hình Firebase)
-      try {
-        final email = username.contains('@') ? username : '$username@smartmoney.com';
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
+      if (fbUser != null && fbUser.email != null) {
+        await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
+          firebaseUid: fbUser.uid,
+          email: fbUser.email!,
+          displayName: fbUser.displayName,
         );
-      } catch (fe) {
-        debugPrint("[RegisterScreen] Đăng ký Firebase Auth chưa thành công (Chế độ Offline): $fe");
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -91,6 +120,76 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       _showSnackBar(
         'Tên đăng nhập này đã được sử dụng!',
+        Colors.red,
+      );
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null || user.email == null || user.email!.isEmpty) {
+        throw Exception("Không thể lấy thông tin Email từ Google.");
+      }
+
+      // Tìm hoặc tạo tài khoản SQLite tương ứng với Firebase UID chuẩn xác
+      final sqliteUser = await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
+        firebaseUid: user.uid,
+        email: user.email!,
+        displayName: user.displayName ?? user.email!,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setInt('userId', sqliteUser['id'] as int);
+      await prefs.setString('username', sqliteUser['username'] as String);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MainNavigationScreen(),
+        ),
+            (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showSnackBar(
+        'Đăng nhập Google chưa thành công. Hãy thử lại!',
         Colors.red,
       );
     }
@@ -154,7 +253,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: AppColors.textSub,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               const Text(
                 'Tên đăng nhập / Email',
@@ -226,7 +325,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleRegister,
@@ -253,6 +352,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _handleGoogleSignIn,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.g_mobiledata, color: Colors.redAccent, size: 28),
+                label: const Text(
+                  'Đăng ký bằng Google',
+                  style: TextStyle(
+                    color: AppColors.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
               ),

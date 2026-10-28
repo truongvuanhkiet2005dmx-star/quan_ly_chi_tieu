@@ -5,6 +5,7 @@ import 'package:telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../database/database_helper.dart';
 import 'notification_service.dart';
 import 'sync_service.dart';
@@ -285,19 +286,36 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // 1. Tự động khôi phục userId nếu SharedPreferences trả về null trong Background Isolate
+    // 1. Tự động khôi phục userId chuẩn xác nếu SharedPreferences trả về null trong Background Isolate
     if (userId == null) {
-      final userRows = await db.query('users', orderBy: 'id DESC', limit: 1);
-      if (userRows.isNotEmpty) {
-        userId = userRows.first['id'] as int?;
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
+        final sqliteUser = await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
+          firebaseUid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          displayName: firebaseUser.displayName,
+        );
+        userId = sqliteUser['id'] as int?;
       }
-      userId ??= 1;
+
+      if (userId == null) {
+        final userRows = await db.query('users', orderBy: 'id DESC', limit: 1);
+        if (userRows.isNotEmpty) {
+          userId = userRows.first['id'] as int?;
+        }
+      }
+
+      if (userId == null) {
+        userId = await DatabaseHelper.instance.registerUser('user_auto', 'AUTO_SECURE_PASS');
+      }
     }
 
-    // 2. Lấy danh sách ví theo userId
-    List<Map<String, dynamic>> wallets = await DatabaseHelper.instance.getWallets(userId);
+    final activeUserId = userId;
 
-    // Nếu không tìm thấy ví theo userId trong prefs, truy vấn toàn bộ ví trong DB
+    // 2. Lấy danh sách ví theo activeUserId
+    List<Map<String, dynamic>> wallets = await DatabaseHelper.instance.getWallets(activeUserId);
+
+    // Nếu không tìm thấy ví theo activeUserId trong prefs, truy vấn toàn bộ ví trong DB
     if (wallets.isEmpty) {
       wallets = await db.query('wallets', orderBy: 'id ASC');
     }
@@ -305,7 +323,7 @@ class AutoTransactionService {
     // 3. Nếu DB hoàn toàn chưa có ví nào, tự động tạo Ví VietinBank mặc định
     if (wallets.isEmpty) {
       int newWalletId = await db.insert('wallets', {
-        'userId': userId,
+        'userId': activeUserId,
         'name': 'Ví VietinBank',
         'type': 'bank',
         'balance': parsedAccountBalance ?? 1000000,
@@ -314,7 +332,7 @@ class AutoTransactionService {
       wallets = [
         {
           'id': newWalletId,
-          'userId': userId,
+          'userId': activeUserId,
           'name': 'Ví VietinBank',
           'type': 'bank',
           'balance': parsedAccountBalance ?? 1000000,
@@ -326,7 +344,7 @@ class AutoTransactionService {
     final matchedWallet = findMatchingWallet(wallets, rawContent, extractedStk) ?? wallets.first;
 
     final walletId = matchedWallet['id'] as int;
-    final walletUserId = matchedWallet['userId'] as int? ?? userId;
+    final walletUserId = matchedWallet['userId'] as int? ?? activeUserId;
     final walletName = matchedWallet['name'] as String;
     final currentBalance = matchedWallet['balance'] as int;
 

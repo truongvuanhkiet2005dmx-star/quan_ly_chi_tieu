@@ -1,4 +1,8 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- INTERNET -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <!-- CAMERA -->
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -28,7 +32,8 @@
     <application
         android:label="Quản lý chi tiêu"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
 
         <!-- DỊCH VỤ LẮNG NGHE THÔNG BÁO PUSH TỪ APP NGÂN HÀNG -->
         <service android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
