@@ -69,25 +69,40 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 
+var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>()
+    ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5104",
-                "http://localhost:3000",
-                "https://localhost:7146")
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        if (corsOrigins.Length == 0)
+        {
+            policy.WithOrigins(
+                    "http://localhost:5104",
+                    "http://localhost:3000",
+                    "https://localhost:7146")
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
     });
 });
+
+var rateLimitPermit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 300);
+if (rateLimitPermit < 1) rateLimitPermit = 300;
 
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("transactions", limiterOptions =>
     {
         limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.PermitLimit = 60;
+        limiterOptions.PermitLimit = rateLimitPermit;
         limiterOptions.QueueLimit = 0;
     });
 });
