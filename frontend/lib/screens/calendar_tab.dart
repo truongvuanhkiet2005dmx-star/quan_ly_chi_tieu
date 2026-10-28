@@ -308,7 +308,8 @@ class _CalendarTabState extends State<CalendarTab> {
                               (transaction) {
                             final category = transaction['categoryName'].toString();
                             final type = transaction['type'].toString();
-                            final amount = transaction['amount'] as int;
+                            // F3 Fix: Safe num casting
+                            final amount = (transaction['amount'] as num?)?.toInt() ?? 0;
                             final isExpense = type == 'expense';
                             final isTransfer = type == 'transfer';
 

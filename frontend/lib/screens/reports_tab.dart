@@ -65,7 +65,8 @@ class _ReportsTabState extends State<ReportsTab> {
       if (date == null) continue;
 
       if (date.year == now.year && date.month == _selectedMonth) {
-        final amount = tx['amount'] as int;
+        // F2 Fix: Safe num casting
+        final amount = (tx['amount'] as num?)?.toInt() ?? 0;
         final category = tx['categoryName'].toString();
 
         total += amount;

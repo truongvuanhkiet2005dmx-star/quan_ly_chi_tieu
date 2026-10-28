@@ -113,9 +113,11 @@ class _AddTransactionScreenState
   }
 
   int _getAmount() {
-    return int.tryParse(
-      _amount.replaceAll(',', ''),
-    ) ?? 0;
+    final cleaned = _amount.replaceAll(',', '').replaceAll('.', '').trim();
+    final parsed = num.tryParse(cleaned);
+    if (parsed == null || parsed <= 0) return 0;
+    if (parsed > 1000000000000) return 1000000000000;
+    return parsed.toInt();
   }
 
   String _formatMoney(int amount) {
