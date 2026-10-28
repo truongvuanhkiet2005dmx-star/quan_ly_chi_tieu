@@ -8,8 +8,8 @@ namespace Backend_Nhom6_QuanLyChiTieu.Models
         [StringLength(200, MinimumLength = 1, ErrorMessage = "EventId phải từ 1 đến 200 ký tự.")]
         public string EventId { get; set; } = string.Empty;
 
-        [Range(1, int.MaxValue, ErrorMessage = "Số tiền phải lớn hơn 0.")]
-        public int Amount { get; set; }
+        [Range(1, long.MaxValue, ErrorMessage = "Số tiền phải lớn hơn 0.")]
+        public long Amount { get; set; }
 
         [Required(ErrorMessage = "Type là bắt buộc.")]
         [StringLength(50)]

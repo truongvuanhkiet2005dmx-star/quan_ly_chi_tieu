@@ -23,7 +23,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Amount")
+                    b.Property<long>("Amount")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("BankName")

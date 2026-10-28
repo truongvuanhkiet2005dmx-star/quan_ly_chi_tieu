@@ -8,6 +8,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
 {
     [Authorize]
     [ApiController]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
     public class TransactionsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -107,13 +108,14 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 await _context.SaveChangesAsync();
                 return Ok(new { success = true, message = "Lưu thành công!" });
             }
-            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+            catch (DbUpdateException)
             {
-                // Bắt lỗi khi 2 request đến cùng một mili-giây qua được lớp kiểm tra ứng dụng
+                // Bắt lỗi race-condition; chỉ trả duplicate khi bản ghi tồn tại.
                 var concurrentTx = await _context.Transactions
                     .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId);
 
-                if (concurrentTx != null) return HandleDuplicate(concurrentTx, dto);
+                if (concurrentTx != null)
+                    return HandleDuplicate(concurrentTx, dto);
 
                 throw;
             }
