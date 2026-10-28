@@ -32,6 +32,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -61,8 +62,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=smartmoney.db"));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=smartmoney.db";
+
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 
 builder.Services.AddCors(options =>
 {
@@ -71,46 +74,33 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            success = false,
+            message = "Đã xảy ra lỗi máy chủ."
+        });
+    });
+});
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-
-    // Bổ sung cột cho database SQLite đã tồn tại mà không xóa hoặc tái tạo database.
-    var connection = db.Database.GetDbConnection();
-    connection.Open();
-    var hasUidColumn = false;
-    using (var command = connection.CreateCommand())
-    {
-        command.CommandText = "PRAGMA table_info(Transactions);";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            if (reader.GetString(1).Equals("Uid", StringComparison.OrdinalIgnoreCase))
-            {
-                hasUidColumn = true;
-                break;
-            }
-        }
-    }
-
-    if (!hasUidColumn)
-    {
-        db.Database.ExecuteSqlRaw("ALTER TABLE Transactions ADD COLUMN Uid TEXT NULL;");
-    }
-
-    connection.Close();
-
-    db.Database.ExecuteSqlRaw(
-        "CREATE UNIQUE INDEX IF NOT EXISTS IX_Transactions_Uid_EventId ON Transactions (Uid, EventId);");
+    db.Database.Migrate();
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors("AllowAll");
-
-// BẮT BUỘC: Authentication phải nằm trước Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 

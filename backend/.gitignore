@@ -13,6 +13,7 @@ obj/
 *.suo
 
 # Secrets and local environment files
+appsettings.Development.json
 appsettings.*.local.json
 .env
 .env.*

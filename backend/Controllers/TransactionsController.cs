@@ -19,20 +19,56 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
 
         [AllowAnonymous]
         [HttpGet("/health")]
-        public IActionResult HealthCheck() => Ok(new { status = "Backend Secured with Firebase JWT!" });
+        public async Task<IActionResult> HealthCheck()
+        {
+            var databaseConnected = await _context.Database.CanConnectAsync();
+            return Ok(new { status = "ok", database = databaseConnected ? "connected" : "disconnected" });
+        }
 
         [HttpGet("api/transactions")]
-        public async Task<IActionResult> GetTransactions()
+        public async Task<IActionResult> GetTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var uid = GetFirebaseUid();
+            if (string.IsNullOrEmpty(uid)) return Unauthorized();
+            if (page < 1 || pageSize < 1 || pageSize > 100)
+                return BadRequest(new { success = false, message = "page phải >= 1 và pageSize từ 1 đến 100." });
+
+            var query = _context.Transactions.Where(t => t.Uid == uid);
+            var total = await query.CountAsync();
+            var data = await query
+                .OrderByDescending(t => t.OccurredAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new { page, pageSize, total, data });
+        }
+
+        [HttpGet("api/transactions/{id:int}")]
+        public async Task<IActionResult> GetTransaction(int id)
         {
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
 
-            var data = await _context.Transactions
-                .Where(t => t.Uid == uid)
-                .OrderByDescending(t => t.OccurredAt)
-                .ToListAsync();
+            var transaction = await _context.Transactions.FirstOrDefaultAsync(t => t.Id == id && t.Uid == uid);
+            return transaction == null
+                ? NotFound(new { success = false, message = "Không tìm thấy giao dịch." })
+                : Ok(transaction);
+        }
 
-            return Ok(data);
+        [HttpDelete("api/transactions/{id:int}")]
+        public async Task<IActionResult> DeleteTransaction(int id)
+        {
+            var uid = GetFirebaseUid();
+            if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+            var transaction = await _context.Transactions.FirstOrDefaultAsync(t => t.Id == id && t.Uid == uid);
+            if (transaction == null)
+                return NotFound(new { success = false, message = "Không tìm thấy giao dịch." });
+
+            _context.Transactions.Remove(transaction);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Xóa giao dịch thành công." });
         }
 
         [HttpPost("api/transactions")]
