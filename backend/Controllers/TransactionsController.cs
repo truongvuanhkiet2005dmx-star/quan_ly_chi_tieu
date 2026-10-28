@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using Backend_Nhom6_QuanLyChiTieu.Data;
 using Backend_Nhom6_QuanLyChiTieu.Models;
 
@@ -86,11 +87,13 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
         [HttpPost("api/transactions")]
         public async Task<IActionResult> CreateTransaction([FromBody] TransactionCreateDto dto, CancellationToken cancellationToken)
         {
-            if (dto.OccurredAt == default || dto.OccurredAt.Year < 1900)
+            if (dto.OccurredAt == default
+                || dto.OccurredAt.Year < 1900
+                || dto.OccurredAt > DateTimeOffset.UtcNow.AddDays(1))
                 return BadRequest(new { success = false, message = "OccurredAt phải là thời điểm hợp lệ." });
 
             var occurredAtUtc = dto.OccurredAt.UtcDateTime;
-
+            var normalizedType = dto.Type.Trim().ToLowerInvariant();
 
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
@@ -107,7 +110,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 Uid = uid,
                 EventId = dto.EventId,
                 Amount = dto.Amount,
-                Type = dto.Type,
+                Type = normalizedType,
                 Source = dto.Source,
                 BankName = dto.BankName,
                 PackageName = dto.PackageName,
@@ -122,9 +125,10 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 await _context.SaveChangesAsync(cancellationToken);
                 return Ok(new { success = true, message = "Lưu thành công!" });
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
+                when (ex.InnerException is SqliteException sqliteException
+                      && sqliteException.SqliteErrorCode == 19)
             {
-                // Bắt lỗi race-condition; chỉ trả duplicate khi bản ghi tồn tại.
                 var concurrentTx = await _context.Transactions
                     .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId, cancellationToken);
 
@@ -138,7 +142,8 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
         private string? GetFirebaseUid()
         {
             // MapInboundClaims = false giữ claim Firebase chuẩn; UID nằm trong "sub".
-            return User.FindFirst("sub")?.Value;
+            return User.FindFirst("sub")?.Value?.Trim()
+                ?? User.FindFirst("user_id")?.Value?.Trim();
         }
 
         private IActionResult HandleDuplicate(Transaction existing)

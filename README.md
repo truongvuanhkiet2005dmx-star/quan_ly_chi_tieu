@@ -18,7 +18,9 @@ Thu muc `frontend/` chua toan bo du an Flutter hien co. Phan frontend da co cac 
 
 ### Backend
 
-Thu muc `backend/` hien chua `/.gitkeep` vi ma nguon C# ASP.NET Core chua duoc cung cap. Backend dang trong qua trinh phat trien va chua co huong dan chay API cu the trong phan nay.
+Thu muc `backend/` chứa API ASP.NET Core C# xác thực Firebase ID token và lưu giao dịch vào SQLite. Hướng dẫn chạy chi tiết xem tại [`backend/README.md`](backend/README.md).
+
+Backend chạy mặc định ở `http://0.0.0.0:5104` trong Development profile.
 
 ## Tai ma nguon bang ZIP
 
@@ -41,12 +43,12 @@ Lenh tren duoc thuc hien trong thu muc `frontend/`. Cach chay tren tung thiet bi
 
 ## Backend
 
-Backend C# ASP.NET Core chua duoc tao ma nguon. Khi duoc bo sung, phai kiem tra lai day du project file, SDK, database, cau hinh va cong API trong repo truoc khi viet huong dan chay cu the.
+Backend C# ASP.NET Core đã có mã nguồn trong thư mục `backend/`, hỗ trợ Firebase Authentication, EF Core SQLite và Swagger Bearer token. Tài liệu chi tiết xem tại [`backend/README.md`](backend/README.md).
 
 ## Tinh trang hoan thien
 
 - Frontend Flutter: da co cau truc du an va nhieu man hinh/chuc nang co ban.
-- Backend ASP.NET Core C#: dang phat trien; chua co ma nguon trong repository.
+- Backend ASP.NET Core C#: đã có mã nguồn, API xác thực Firebase và lưu SQLite. Xem `backend/README.md`.
 - Tich hop frontend-backend va tai lieu cau hinh may chu: chua hoan tat cho den khi backend duoc bo sung.
 
 ## Tieu chuan git

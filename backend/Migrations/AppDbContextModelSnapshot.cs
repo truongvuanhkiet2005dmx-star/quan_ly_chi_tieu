@@ -66,6 +66,8 @@ namespace Backend_Nhom6_QuanLyChiTieu.Migrations
                     b.HasIndex("Uid", "EventId")
                         .IsUnique();
 
+                    b.HasIndex("Uid", "OccurredAt");
+
                     b.ToTable("Transactions");
                 });
 #pragma warning restore 612, 618

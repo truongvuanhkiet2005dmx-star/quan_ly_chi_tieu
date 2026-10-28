@@ -1,4 +1,4 @@
-﻿using System.Threading.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -7,8 +7,11 @@ using Backend_Nhom6_QuanLyChiTieu.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var firebaseProjectId = builder.Configuration["FIREBASE_PROJECT_ID"]
-    ?? builder.Configuration["Firebase:ProjectId"];
+var firebaseProjectId = builder.Configuration["FIREBASE_PROJECT_ID"];
+if (string.IsNullOrWhiteSpace(firebaseProjectId))
+{
+    firebaseProjectId = builder.Configuration["Firebase:ProjectId"];
+}
 
 if (string.IsNullOrWhiteSpace(firebaseProjectId))
 {
@@ -30,7 +33,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
             ValidateAudience = true,
             ValidAudience = firebaseProjectId,
-            ValidateLifetime = true
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
 
@@ -46,7 +50,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Nhập Firebase ID token. Swagger sẽ gửi header Authorization: Bearer <token>."
+        Description = "Nhập Firebase ID token. Swagger sẽ gửi header Authorization: Bearer <Firebase ID token>."
     });
     options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
@@ -71,6 +75,15 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connect
 
 var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>()
     ?? Array.Empty<string>();
+
+if (corsOrigins.Length == 0)
+{
+    using var startupLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+    startupLoggerFactory.CreateLogger("Startup").LogWarning(
+        "CorsOrigins rỗng — đang dùng origin mặc định (localhost only). " +
+        "Frontend chạy trên IP LAN sẽ không gọi được API. " +
+        "Kiểm tra appsettings.json hoặc set biến môi trường CorsOrigins__0.");
+}
 
 builder.Services.AddCors(options =>
 {
@@ -108,6 +121,12 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+if (corsOrigins.Length == 0)
+{
+    app.Logger.LogWarning(
+        "Chưa cấu hình CorsOrigins. Backend đang dùng danh sách origin Development mặc định; hãy cấu hình CorsOrigins cho môi trường triển khai.");
+}
 
 app.UseExceptionHandler(errorApp =>
 {

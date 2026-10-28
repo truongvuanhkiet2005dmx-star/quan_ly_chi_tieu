@@ -17,6 +17,9 @@ namespace Backend_Nhom6_QuanLyChiTieu.Data
             modelBuilder.Entity<Transaction>()
                 .HasIndex(t => new { t.Uid, t.EventId })
                 .IsUnique();
+
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => new { t.Uid, t.OccurredAt });
         }
     }
 }

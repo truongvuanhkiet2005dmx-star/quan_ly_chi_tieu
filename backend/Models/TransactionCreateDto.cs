@@ -12,6 +12,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Models
         public long Amount { get; set; }
 
         [Required(ErrorMessage = "Type là bắt buộc.")]
+        [RegularExpression("^(expense|income|transfer)$", ErrorMessage = "Type không hợp lệ.")]
         [StringLength(50)]
         public string Type { get; set; } = string.Empty;
 
@@ -34,4 +35,5 @@ namespace Backend_Nhom6_QuanLyChiTieu.Models
         [StringLength(1000)]
         public string Note { get; set; } = string.Empty;
     }
+
 }
