@@ -28,7 +28,7 @@ cd backend
 ```
 
 Development profile mặc định lắng nghe trên tất cả mạng: `http://0.0.0.0:5104`.
-Từ máy khác hoặc thiết bị thực, dùng địa chỉ IPv4 LAN của máy chạy backend, ví dụ: `http://192.168.1.10:5104`. Android Emulator thường dùng `http://10.0.2.2:5104`.
+Từ máy khác hoặc thiết bị thực, dùng địa chỉ IPv4 LAN của máy chạy backend. Máy hiện tại có địa chỉ Wi-Fi `10.0.128.222`, do đó backend truy cập qua LAN là `http://10.0.128.222:5104`. Android Emulator thường dùng `http://10.0.2.2:5104`.
 
 Swagger Development: `http://localhost:5104/swagger`.
 
@@ -49,7 +49,7 @@ Frontend chạy trên Flutter Web phải cấu hình đúng origin xuất hiện
 "CorsOrigins": [
   "http://localhost:5104",
   "http://localhost:3000",
-  "http://192.168.1.10:3000",
+  "http://10.0.128.222:3000",
   "https://localhost:7146"
 ]
 ```
@@ -57,12 +57,12 @@ Frontend chạy trên Flutter Web phải cấu hình đúng origin xuất hiện
 Có thể cấu hình bằng biến môi trường thay vì sửa file:
 
 ```powershell
-$env:CorsOrigins__0 = "http://192.168.1.10:3000"
+$env:CorsOrigins__0 = "http://10.0.128.222:3000"
 $env:CorsOrigins__1 = "http://localhost:3000"
 dotnet run --launch-profile http
 ```
 
-Thay `192.168.1.10` bằng IPv4 LAN thực tế của máy chạy Flutter Web. Flutter Android/iOS không bị giới hạn bởi CORS của trình duyệt.
+Thay `10.0.128.222` bằng IPv4 LAN thực tế của máy chạy Flutter Web nếu địa chỉ mạng thay đổi. Flutter Android/iOS không bị giới hạn bởi CORS của trình duyệt.
 
 `OccurredAt` được chuẩn hóa về UTC trước khi lưu và kiểm tra giao dịch trùng. SQLite lưu dữ liệu tại `smartmoney.db`; backend chạy EF Core migrations khi khởi động và không xóa database để cập nhật schema.
 

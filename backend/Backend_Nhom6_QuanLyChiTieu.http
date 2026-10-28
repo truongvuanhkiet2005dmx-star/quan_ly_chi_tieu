@@ -1,6 +1,6 @@
 # Dùng localhost khi chạy thử trên chính máy backend.
 # Khi chạy thử từ máy khác, đổi thành http://<IPv4-LAN-của-máy-backend>:5104
-@Backend_Nhom6_QuanLyChiTieu_HostAddress = http://localhost:5104
+@Backend_Nhom6_QuanLyChiTieu_HostAddress = http://10.0.128.222:5104
 
 ### Health check
 GET {{Backend_Nhom6_QuanLyChiTieu_HostAddress}}/health
