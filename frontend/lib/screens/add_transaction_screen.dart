@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../core/app_colors.dart';
 import '../core/voice_parser_util.dart';
 import '../database/database_helper.dart';
+import '../services/auto_transaction_service.dart';
 import '../services/sync_service.dart';
 import 'bill_scanner_screen.dart';
 
@@ -160,7 +161,6 @@ class _AddTransactionScreenState
       return;
     }
 
-    // F4: VNĐ là số nguyên, bỏ qua phím lẻ hoặc định dạng chuẩn
     if (key == ',' || key == '.') {
       return;
     }
@@ -229,7 +229,6 @@ class _AddTransactionScreenState
                   final balance = wallet['balance'] as int;
                   final walletId = wallet['id'] as int;
 
-                  // Không cho phép chọn trùng 1 ví làm cả nguồn và đích
                   if (isTargetWallet && walletId == _selectedWalletId) {
                     return const SizedBox.shrink();
                   }
@@ -361,7 +360,6 @@ class _AddTransactionScreenState
 
     if (_userId == null || _selectedWalletId == null) return;
 
-    // F1: Kiểm tra ví đích cho giao dịch Chuyển khoản
     if (_tabIndex == 2 && (_selectedToWalletId == null || _selectedToWalletId == _selectedWalletId)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -393,7 +391,6 @@ class _AddTransactionScreenState
         final currentBalance = fromWallet.first['balance'] as int;
 
         if (_tabIndex == 0) {
-          // 0: Chi tiêu -> Trừ ví nguồn
           await txn.update(
             'wallets',
             {'balance': currentBalance - amount},
@@ -401,7 +398,6 @@ class _AddTransactionScreenState
             whereArgs: [_selectedWalletId, _userId],
           );
         } else if (_tabIndex == 1) {
-          // 1: Thu nhập -> Cộng ví nguồn
           await txn.update(
             'wallets',
             {'balance': currentBalance + amount},
@@ -409,7 +405,6 @@ class _AddTransactionScreenState
             whereArgs: [_selectedWalletId, _userId],
           );
         } else if (_tabIndex == 2) {
-          // 2: Chuyển khoản -> Trừ ví nguồn, cộng ví đích
           await txn.update(
             'wallets',
             {'balance': currentBalance - amount},
@@ -471,7 +466,6 @@ class _AddTransactionScreenState
         );
       });
 
-      // F13: Await lệnh đồng bộ backend
       bool isSyncedSuccess = false;
       try {
         final txData = {
@@ -502,6 +496,9 @@ class _AddTransactionScreenState
           backgroundColor: isSyncedSuccess ? Colors.green : Colors.orange,
         ),
       );
+
+      // F2 Fix: Emit event vào Stream để HomeTab, WalletsTab, ReportsTab tự động reload dữ liệu mượt mà
+      AutoTransactionService.instance.onTransactionAdded.add(true);
 
       Navigator.pop(context, true);
     } catch (e) {
@@ -583,7 +580,6 @@ class _AddTransactionScreenState
       ),
       body: Column(
         children: [
-          // Selector Chi tiêu | Thu nhập | Chuyển khoản
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             padding: const EdgeInsets.all(4),
@@ -600,7 +596,6 @@ class _AddTransactionScreenState
             ),
           ),
 
-          // Lưới chọn danh mục (ẩn khi chuyển khoản)
           Expanded(
             child: _tabIndex == 2
                 ? Padding(
@@ -703,7 +698,6 @@ class _AddTransactionScreenState
             ),
           ),
 
-          // Khung số tiền & Ghi chú
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: AppColors.surface,
@@ -781,7 +775,6 @@ class _AddTransactionScreenState
             ),
           ),
 
-          // Bàn phím Máy tính
           Container(
             color: AppColors.card,
             padding: EdgeInsets.only(
@@ -971,7 +964,6 @@ class _VoiceInputModalState extends State<_VoiceInputModal> {
       return;
     }
 
-    // F9: Sử dụng VoiceParserUtil thống nhất
     final parsed = VoiceParserUtil.parseVoiceInput(_liveText);
 
     widget.onVoiceParsed(parsed['amount'] as int?, parsed['category'] as String?, parsed['note'] as String?);

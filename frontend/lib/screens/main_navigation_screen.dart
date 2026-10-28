@@ -24,7 +24,6 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState
     extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  int _refreshKey = 0;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
 
@@ -38,23 +37,16 @@ class _MainNavigationScreenState
     AutoTransactionService.instance.initialize();
   }
 
-  List<Widget> get _screens => [
-    HomeTab(
-      key: ValueKey('home_$_refreshKey'),
-    ),
-    ReportsTab(
-      key: ValueKey('reports_$_refreshKey'),
-    ),
-    WalletsTab(
-      key: ValueKey('wallets_$_refreshKey'),
-    ),
-    ProfileTab(
-      key: ValueKey('profile_$_refreshKey'),
-    ),
+  // F1 Fix: Bỏ _refreshKey hoàn toàn, giữ 4 tab hằng số để không bao giờ bị dispose/recreate
+  List<Widget> get _screens => const [
+    HomeTab(),
+    ReportsTab(),
+    WalletsTab(),
+    ProfileTab(),
   ];
 
   Future<void> _openAddTransaction({String? amount, String? note}) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddTransactionScreen(
@@ -63,12 +55,6 @@ class _MainNavigationScreenState
         ),
       ),
     );
-
-    if (result == true && mounted) {
-      setState(() {
-        _refreshKey++;
-      });
-    }
   }
 
   Future<void> _openBillScanner() async {
@@ -90,12 +76,6 @@ class _MainNavigationScreenState
           ),
         ),
       );
-
-      if (mounted) {
-        setState(() {
-          _refreshKey++;
-        });
-      }
     }
   }
 
