@@ -69,13 +69,23 @@ class AutoTransactionService {
       title = evt.title ?? '';
       text = evt.text ?? '';
       message = evt.message ?? '';
+
+      // F2 Fix: Đọc bigText, subText, textLines từ evt.raw nếu evt thuộc kiểu NotificationEvent
+      if (evt.raw != null && evt.raw is Map) {
+        final rawMap = evt.raw as Map;
+        bigText = (rawMap['bigText'] ?? rawMap['big_text'] ?? rawMap['android.bigText'] ?? '').toString();
+        subText = (rawMap['subText'] ?? rawMap['sub_text'] ?? rawMap['android.subText'] ?? '').toString();
+        if (rawMap['textLines'] is List) {
+          textLines = (rawMap['textLines'] as List).map((e) => e.toString()).toList();
+        }
+      }
     } else if (evt is Map) {
       pkg = (evt['package_name'] ?? evt['packageName'] ?? '').toString().toLowerCase();
       title = (evt['title'] ?? '').toString();
       text = (evt['text'] ?? '').toString();
       message = (evt['message'] ?? '').toString();
-      bigText = (evt['bigText'] ?? evt['big_text'] ?? '').toString();
-      subText = (evt['subText'] ?? evt['sub_text'] ?? '').toString();
+      bigText = (evt['bigText'] ?? evt['big_text'] ?? evt['android.bigText'] ?? '').toString();
+      subText = (evt['subText'] ?? evt['sub_text'] ?? evt['android.subText'] ?? '').toString();
       if (evt['textLines'] is List) {
         textLines = (evt['textLines'] as List).map((e) => e.toString()).toList();
       }
@@ -83,7 +93,7 @@ class AutoTransactionService {
       message = evt;
     }
 
-    // Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội/Zalo (N2)
+    // Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội/Zalo
     if (pkg.isNotEmpty) {
       bool isAllowed = AppConstants.allowedBankPackages.any((allowed) => pkg.contains(allowed));
       if (!isAllowed && !pkg.contains('sms') && !pkg.contains('messaging') && !pkg.contains('mms')) {
@@ -312,7 +322,7 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // N1: Khôi phục userId nếu SharedPreferences chưa có. Không tự ý tạo user 'user_auto' rác.
+    // F3 Fix: Bỏ hẳn việc tự động tạo tài khoản user_auto rác trong SQLite
     if (userId == null) {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
@@ -331,16 +341,16 @@ class AutoTransactionService {
         }
       }
 
-      // N1: Nếu vẫn không tìm thấy người dùng nào trong DB -> Bỏ qua, không tạo user rác
+      // F3 Fix: Nếu vẫn không tìm thấy người dùng nào trong CSDL -> Bỏ qua, không bao giờ tự tạo user_auto rác
       if (userId == null) {
-        debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch vì chưa có người dùng nào trong CSDL.");
+        debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch tự động vì chưa có người dùng đăng nhập trong CSDL.");
         return;
       }
     }
 
     final activeUserId = userId;
 
-    // 2. Lấy danh sách ví theo activeUserId
+    // Lấy danh sách ví theo activeUserId
     List<Map<String, dynamic>> wallets = await DatabaseHelper.instance.getWallets(activeUserId);
 
     if (wallets.isEmpty) {
@@ -423,7 +433,7 @@ class AutoTransactionService {
 
     onTransactionAdded.add(true);
 
-    // N3: Safe notification call
+    // F4 Fix: Đảm bảo NotificationService khởi tạo đầy đủ trong Background Isolate trước khi phát notification
     try {
       String typeText = isExpense ? 'Chi tiêu' : 'Thu nhập';
       String formattedAmount = _formatMoney(amount);
@@ -432,7 +442,7 @@ class AutoTransactionService {
         '$typeText +$formattedAmount đ tại ví "$walletName".',
       );
     } catch (e) {
-      debugPrint("Notification error: $e");
+      debugPrint("Notification error in background: $e");
     }
 
     try {
@@ -473,15 +483,20 @@ void notificationCallbackHandle(NotificationEvent evt) async {
   try {
     await Firebase.initializeApp();
   } catch (_) {}
+  try {
+    await NotificationService.instance.initializeForBackground();
+  } catch (_) {}
   AutoTransactionService.instance.handleNotificationEvent(evt);
 }
 
-// N5: Sử dụng await trong backgroundMessageHandler
 @pragma('vm:entry-point')
 void backgroundMessageHandler(SmsMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+  } catch (_) {}
+  try {
+    await NotificationService.instance.initializeForBackground();
   } catch (_) {}
   if (message.body != null && message.body!.isNotEmpty) {
     await AutoTransactionService.instance.processSmsContent(message.body!);
