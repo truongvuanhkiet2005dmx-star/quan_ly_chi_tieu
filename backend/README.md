@@ -22,9 +22,9 @@ Nếu thiếu Project ID, server sẽ từ chối khởi động và báo lỗi 
 
 ```powershell
 cd backend
- dotnet restore
- dotnet build
- dotnet run --launch-profile http
+dotnet restore
+dotnet build
+dotnet run --launch-profile http
 ```
 
 Development profile mặc định lắng nghe trên tất cả mạng: `http://0.0.0.0:5104`.
@@ -38,10 +38,15 @@ Trong Swagger chọn **Authorize**, nhập Firebase ID token. Swagger tự gửi
 Authorization: Bearer <Firebase ID token>
 ```
 
-`GET /health` không yêu cầu đăng nhập. Các API giao dịch yêu cầu Firebase ID token hợp lệ:
+Các API:
 
-- `GET /api/transactions`
-- `POST /api/transactions`
+- `GET /health` — công khai, không cần token
+- `GET /api/transactions` — yêu cầu token, hỗ trợ `page` và `pageSize`
+- `GET /api/transactions/{id}` — yêu cầu token
+- `POST /api/transactions` — yêu cầu token
+- `DELETE /api/transactions/{id}` — yêu cầu token
+
+UID được lấy từ claim `sub`; client không được gửi UID trong POST.
 
 Frontend chạy trên Flutter Web phải cấu hình đúng origin xuất hiện trên thanh địa chỉ trình duyệt trong `CorsOrigins`, ví dụ:
 
@@ -67,3 +72,4 @@ Thay `10.0.128.222` bằng IPv4 LAN thực tế của máy chạy Flutter Web n�
 `OccurredAt` được chuẩn hóa về UTC trước khi lưu và kiểm tra giao dịch trùng. SQLite lưu dữ liệu tại `smartmoney.db`; backend chạy EF Core migrations khi khởi động và không xóa database để cập nhật schema.
 
 Các file database, WAL, build output, IDE state và cấu hình secret local đã được bỏ qua bởi Git. Production bật HSTS và HTTPS redirection; Development cho phép chạy HTTP local.
+
