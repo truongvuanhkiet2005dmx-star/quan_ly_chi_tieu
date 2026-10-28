@@ -6,6 +6,7 @@ import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import '../services/auto_transaction_service.dart';
 import '../services/sync_service.dart';
+import 'welcome_setup_screen.dart';
 import 'sms_list_screen.dart';
 import 'calendar_tab.dart';
 
@@ -59,7 +60,18 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     });
 
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId') ?? 1;
+    final userId = prefs.getInt('userId');
+
+    // F6: Nếu chưa đăng nhập (userId == null), điều hướng về màn hình Welcome thay vì fallback user 1
+    if (userId == null) {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const WelcomeSetupScreen()),
+            (route) => false,
+      );
+      return;
+    }
 
     final wallets = await DatabaseHelper.instance.getWallets(userId);
     int balance = 0;

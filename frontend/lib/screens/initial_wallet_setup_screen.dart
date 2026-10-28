@@ -200,7 +200,7 @@ class _InitialWalletSetupScreenState
               const SizedBox(height: 8),
 
               DropdownButtonFormField<String>(
-                value: _selectedBank,
+                initialValue: _selectedBank,
                 dropdownColor: AppColors.card,
                 style: const TextStyle(color: AppColors.textDark),
                 decoration: InputDecoration(

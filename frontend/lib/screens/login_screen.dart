@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../core/app_colors.dart';
+import '../core/constants.dart';
 import '../database/database_helper.dart';
 import 'register_screen.dart';
 import 'main_navigation_screen.dart';
@@ -153,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ['email'],
-        serverClientId: '1012237002765-669qvmkevs7p6dclujhd0tm2ofab0kkb.apps.googleusercontent.com',
+        serverClientId: AppConstants.googleServerClientId,
       );
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 

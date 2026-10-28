@@ -7,7 +7,6 @@ import 'core/app_colors.dart';
 import 'screens/welcome_setup_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'services/notification_service.dart';
-import 'services/auto_transaction_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,12 +27,6 @@ void main() async {
     await NotificationService.instance.initialize();
   } catch (e) {
     debugPrint("Error initializing NotificationService: $e");
-  }
-
-  try {
-    AutoTransactionService.instance.initialize();
-  } catch (e) {
-    debugPrint("Error initializing AutoTransactionService: $e");
   }
 
   runApp(const SmartMoneyApp());

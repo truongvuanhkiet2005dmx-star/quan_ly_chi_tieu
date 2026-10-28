@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/constants.dart';
 import '../database/database_helper.dart';
 import 'notification_service.dart';
 import 'sync_service.dart';
@@ -59,6 +60,9 @@ class AutoTransactionService {
     String title = '';
     String text = '';
     String message = '';
+    String bigText = '';
+    String subText = '';
+    List<String> textLines = [];
 
     if (evt is NotificationEvent) {
       pkg = (evt.packageName ?? '').toLowerCase();
@@ -69,16 +73,33 @@ class AutoTransactionService {
       pkg = (evt['package_name'] ?? evt['packageName'] ?? '').toString().toLowerCase();
       title = (evt['title'] ?? '').toString();
       text = (evt['text'] ?? '').toString();
-      message = (evt['message'] ?? evt['bigText'] ?? evt['text'] ?? '').toString();
+      message = (evt['message'] ?? '').toString();
+      bigText = (evt['bigText'] ?? evt['big_text'] ?? '').toString();
+      subText = (evt['subText'] ?? evt['sub_text'] ?? '').toString();
+      if (evt['textLines'] is List) {
+        textLines = (evt['textLines'] as List).map((e) => e.toString()).toList();
+      }
     } else if (evt is String) {
       message = evt;
+    }
+
+    // F4: Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội
+    if (pkg.isNotEmpty) {
+      bool isAllowed = AppConstants.allowedBankPackages.any((allowed) => pkg.contains(allowed));
+      if (!isAllowed && !pkg.contains('sms') && !pkg.contains('messaging') && !pkg.contains('mms')) {
+        debugPrint("[AutoTransactionService] Bỏ qua thông báo từ app không thuộc danh sách ngân hàng: $pkg");
+        return;
+      }
     }
 
     if (pkg.contains('smart_money') || pkg.contains('example')) {
       return;
     }
 
-    String fullContent = "$title\n$text\n$message".trim();
+    // F1: Đọc bigText, subText và textLines giúp bóc tách số tiền trong thông báo MoMo/Bank VN
+    String combinedLines = textLines.join('\n');
+    String fullContent = "$title\n$text\n$message\n$bigText\n$subText\n$combinedLines".trim();
+
     if (fullContent.isNotEmpty) {
       processSmsContent(fullContent, packageName: pkg);
     }
@@ -203,14 +224,19 @@ class AutoTransactionService {
       return;
     }
 
-    // 2. Chống lặp thông báo trong khoảng thời gian 10 giây (Deduplication Cache)
+    // F3: Chống lặp thông báo qua SharedPreferences đồng bộ giữa các Isolate
     String cacheKey = content.trim();
-    if (!force && _processedCache.contains(cacheKey)) {
-      debugPrint("Bỏ qua thông báo trùng lặp: $cacheKey");
-      return;
-    }
-
     if (!force) {
+      final prefs = await SharedPreferences.getInstance();
+      int now = DateTime.now().millisecondsSinceEpoch;
+      int? lastTime = prefs.getInt('dedup_$cacheKey');
+
+      if (lastTime != null && (now - lastTime) < 10000) {
+        debugPrint("[AutoTransactionService] Bỏ qua thông báo trùng lặp trong cache Isolate: $cacheKey");
+        return;
+      }
+
+      await prefs.setInt('dedup_$cacheKey', now);
       _processedCache.add(cacheKey);
       Timer(const Duration(seconds: 10), () {
         _processedCache.remove(cacheKey);
@@ -221,7 +247,7 @@ class AutoTransactionService {
 
     int? parsedAccountBalance;
     final balanceRegex = RegExp(
-      r'(?:so\s*du|sd|sdc|sodu)\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?:VND|đ|VNĐ|d)',
+      r'(?:so\s*du|sd|sdc|sodu)\s*[:=]?\s*([+-]?\d{1,3}(?:[.,]\d{3})+|[+-]?\d+)\s*(?:VND|đ|VNĐ|d)',
       caseSensitive: false,
     );
     final balanceMatch = balanceRegex.firstMatch(content);
@@ -230,7 +256,11 @@ class AutoTransactionService {
       parsedAccountBalance = int.tryParse(rawBalance.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
     }
 
-    final regex = RegExp(r'([+-]?\d{1,3}(?:[.,]\d{3})+|[+-]?\d+)\s*(?:VND|đ|VNĐ|d|k\b)', caseSensitive: false);
+    // F12: Mở rộng Regex nhận diện số tiền phủ hợp VietinBank, MoMo, VCB, TCB, TPBank, MBBank
+    final regex = RegExp(
+      r'(?:GD|PS|So tien|chuyen|tru|cong|thanh toan)?\s*([+-]?\d{1,3}(?:[.,]\d{3})+|[+-]?\d+)\s*(?:VND|đ|VNĐ|d|k\b)',
+      caseSensitive: false,
+    );
     final match = regex.firstMatch(content);
 
     if (match != null) {
@@ -315,12 +345,10 @@ class AutoTransactionService {
     // 2. Lấy danh sách ví theo activeUserId
     List<Map<String, dynamic>> wallets = await DatabaseHelper.instance.getWallets(activeUserId);
 
-    // Nếu không tìm thấy ví theo activeUserId trong prefs, truy vấn toàn bộ ví trong DB
     if (wallets.isEmpty) {
       wallets = await db.query('wallets', orderBy: 'id ASC');
     }
 
-    // 3. Nếu DB hoàn toàn chưa có ví nào, tự động tạo Ví VietinBank mặc định
     if (wallets.isEmpty) {
       int newWalletId = await db.insert('wallets', {
         'userId': activeUserId,
@@ -348,7 +376,6 @@ class AutoTransactionService {
     final walletName = matchedWallet['name'] as String;
     final currentBalance = matchedWallet['balance'] as int;
 
-    // Bóc tách dòng ND: (Nội dung giao dịch) ngắn gọn
     String displayNote = rawContent;
     final ndMatch = RegExp(r'ND:\s*(.*)', caseSensitive: false).firstMatch(rawContent);
     if (ndMatch != null) {
@@ -396,7 +423,6 @@ class AutoTransactionService {
       );
     });
 
-    // Phát tín hiệu sự kiện để UI (HomeTab, WalletsTab, ReportsTab) làm mới màn hình ngay lập tức
     onTransactionAdded.add(true);
 
     try {
@@ -410,7 +436,6 @@ class AutoTransactionService {
       debugPrint("Notification error: $e");
     }
 
-    // Thử đồng bộ sang C# backend ngay sau khi lưu SQLite
     try {
       final txData = {
         'id': insertedTxId,
@@ -452,10 +477,14 @@ void notificationCallbackHandle(NotificationEvent evt) async {
   AutoTransactionService.instance.handleNotificationEvent(evt);
 }
 
+// F2: Xử lý SMS ngầm khi ứng dụng chạy ẩn
 @pragma('vm:entry-point')
 void backgroundMessageHandler(SmsMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
   } catch (_) {}
+  if (message.body != null && message.body!.isNotEmpty) {
+    AutoTransactionService.instance.processSmsContent(message.body!);
+  }
 }

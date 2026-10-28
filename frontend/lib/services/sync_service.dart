@@ -2,13 +2,15 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import '../core/constants.dart';
 import '../database/database_helper.dart';
 
 class SyncService {
   static final SyncService instance = SyncService._init();
   SyncService._init();
 
-  static const String _backendBaseUrl = 'http://10.0.2.2:5104/api/transactions';
+  // F7: Sử dụng String.fromEnvironment cấu hình URL Backend linh hoạt
+  static const String _backendBaseUrl = AppConstants.backendBaseUrl;
 
   Future<void> syncTransaction(Map<String, dynamic> tx) async {
     final txId = tx['id'] as int?;

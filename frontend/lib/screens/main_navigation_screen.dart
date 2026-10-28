@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/app_colors.dart';
+import '../services/auto_transaction_service.dart';
 import 'home_tab.dart';
 import 'reports_tab.dart';
 import 'wallets_tab.dart';
@@ -29,6 +30,13 @@ class _MainNavigationScreenState
   bool _speechAvailable = false;
   bool _isListening = false;
   String _recognizedText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // F16: Khởi tạo dịch vụ tự động đọc SMS/Notification sau khi đăng nhập thành công
+    AutoTransactionService.instance.initialize();
+  }
 
   List<Widget> get _screens => [
     HomeTab(
@@ -128,25 +136,45 @@ class _MainNavigationScreenState
     if (amount == 0) {
       if (lower.contains('ngàn') || lower.contains('nghìn')) {
         int baseMultiplier = 1000;
-        if (lower.contains('một trăm') || lower.contains('trăm')) baseMultiplier = 100000;
-        else if (lower.contains('hai trăm')) baseMultiplier = 200000;
-        else if (lower.contains('ba trăm')) baseMultiplier = 300000;
-        else if (lower.contains('bốn trăm')) baseMultiplier = 400000;
-        else if (lower.contains('năm trăm')) baseMultiplier = 500000;
-        else if (lower.contains('sáu trăm')) baseMultiplier = 600000;
-        else if (lower.contains('bảy trăm')) baseMultiplier = 700000;
-        else if (lower.contains('tám trăm')) baseMultiplier = 800000;
-        else if (lower.contains('chín trăm')) baseMultiplier = 900000;
-        else if (lower.contains('chín mươi')) baseMultiplier = 90000;
-        else if (lower.contains('tám mươi')) baseMultiplier = 80000;
-        else if (lower.contains('bảy mươi')) baseMultiplier = 70000;
-        else if (lower.contains('sáu mươi')) baseMultiplier = 60000;
-        else if (lower.contains('năm mươi')) baseMultiplier = 50000;
-        else if (lower.contains('bốn mươi')) baseMultiplier = 40000;
-        else if (lower.contains('ba mươi')) baseMultiplier = 30000;
-        else if (lower.contains('hai mươi')) baseMultiplier = 20000;
-        else if (lower.contains('mười')) baseMultiplier = 10000;
-        else if (lower.contains('năm')) baseMultiplier = 5000;
+        if (lower.contains('một trăm') || lower.contains('trăm')) {
+          baseMultiplier = 100000;
+        } else if (lower.contains('hai trăm')) {
+          baseMultiplier = 200000;
+        } else if (lower.contains('ba trăm')) {
+          baseMultiplier = 300000;
+        } else if (lower.contains('bốn trăm')) {
+          baseMultiplier = 400000;
+        } else if (lower.contains('năm trăm')) {
+          baseMultiplier = 500000;
+        } else if (lower.contains('sáu trăm')) {
+          baseMultiplier = 600000;
+        } else if (lower.contains('bảy trăm')) {
+          baseMultiplier = 700000;
+        } else if (lower.contains('tám trăm')) {
+          baseMultiplier = 800000;
+        } else if (lower.contains('chín trăm')) {
+          baseMultiplier = 900000;
+        } else if (lower.contains('chín mươi')) {
+          baseMultiplier = 90000;
+        } else if (lower.contains('tám mươi')) {
+          baseMultiplier = 80000;
+        } else if (lower.contains('bảy mươi')) {
+          baseMultiplier = 70000;
+        } else if (lower.contains('sáu mươi')) {
+          baseMultiplier = 60000;
+        } else if (lower.contains('năm mươi')) {
+          baseMultiplier = 50000;
+        } else if (lower.contains('bốn mươi')) {
+          baseMultiplier = 40000;
+        } else if (lower.contains('ba mươi')) {
+          baseMultiplier = 30000;
+        } else if (lower.contains('hai mươi')) {
+          baseMultiplier = 20000;
+        } else if (lower.contains('mười')) {
+          baseMultiplier = 10000;
+        } else if (lower.contains('năm')) {
+          baseMultiplier = 5000;
+        }
 
         amount = baseMultiplier;
       }
@@ -394,13 +422,13 @@ class _MainNavigationScreenState
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _isListening
-                            ? Colors.red.withOpacity(0.2)
-                            : AppColors.primary.withOpacity(0.2),
+                            ? Colors.red.withValues(alpha: 0.2)
+                            : AppColors.primary.withValues(alpha: 0.2),
                         boxShadow: [
                           BoxShadow(
                             color: _isListening
-                                ? Colors.red.withOpacity(0.3)
-                                : AppColors.primary.withOpacity(0.3),
+                                ? Colors.red.withValues(alpha: 0.3)
+                                : AppColors.primary.withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
@@ -545,7 +573,7 @@ class _MainNavigationScreenState
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: color.withOpacity(0.15),
+            backgroundColor: color.withValues(alpha: 0.15),
             child: Icon(
               icon,
               color: color,
