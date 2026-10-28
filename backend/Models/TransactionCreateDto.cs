@@ -25,7 +25,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Models
         [StringLength(100)]
         public string PackageName { get; set; } = string.Empty;
 
-        public DateTime OccurredAt { get; set; }
+        public DateTimeOffset OccurredAt { get; set; }
 
         [Required(ErrorMessage = "CategoryName là bắt buộc.")]
         [StringLength(100)]

@@ -78,7 +78,8 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
             if (dto.OccurredAt == default || dto.OccurredAt.Year < 1900)
                 return BadRequest(new { success = false, message = "OccurredAt phải là thời điểm hợp lệ." });
 
-            var occurredAtUtc = NormalizeToUtc(dto.OccurredAt);
+            var occurredAtUtc = dto.OccurredAt.UtcDateTime;
+
 
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
@@ -88,7 +89,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId);
 
             if (existingTx != null)
-                return HandleDuplicate(existingTx, dto);
+                return HandleDuplicate(existingTx);
 
             var newTx = new Transaction
             {
@@ -117,7 +118,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                     .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId);
 
                 if (concurrentTx != null)
-                    return HandleDuplicate(concurrentTx, dto);
+                    return HandleDuplicate(concurrentTx);
 
                 throw;
             }
@@ -129,32 +130,16 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
             return User.FindFirst("sub")?.Value;
         }
 
-        private static DateTime NormalizeToUtc(DateTime value)
+        private IActionResult HandleDuplicate(Transaction existing)
         {
-            return value.Kind switch
+            // EventId đã là khóa idempotency (Uid, EventId). Retry cùng EventId phải luôn
+            // trả 200 và không ghi đè hoặc chấp nhận payload khác làm transaction mới.
+            return Ok(new
             {
-                DateTimeKind.Utc => value,
-                DateTimeKind.Local => value.ToUniversalTime(),
-                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
-            };
-        }
-
-        private IActionResult HandleDuplicate(Transaction existing, TransactionCreateDto incoming)
-        {
-            bool isSameData = existing.EventId == incoming.EventId
-                           && existing.Amount == incoming.Amount
-                           && existing.Type == incoming.Type
-                           && existing.Source == incoming.Source
-                           && existing.BankName == incoming.BankName
-                           && existing.PackageName == incoming.PackageName
-                           && NormalizeToUtc(existing.OccurredAt) == NormalizeToUtc(incoming.OccurredAt)
-                           && existing.CategoryName == incoming.CategoryName
-                           && existing.Note == incoming.Note;
-
-            if (isSameData)
-                return Ok(new { success = true, message = "Giao dịch đã tồn tại, bỏ qua lưu trùng.", transactionId = existing.Id });
-
-            return Conflict(new { success = false, message = "Trùng EventId nhưng dữ liệu giao dịch khác biệt." });
+                success = true,
+                message = "Giao dịch đã tồn tại, bỏ qua lưu trùng.",
+                transactionId = existing.Id
+            });
         }
     }
 }
