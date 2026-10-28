@@ -75,8 +75,10 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
         [HttpPost("api/transactions")]
         public async Task<IActionResult> CreateTransaction([FromBody] TransactionCreateDto dto)
         {
-            if (dto.OccurredAt == default)
+            if (dto.OccurredAt == default || dto.OccurredAt.Year < 1900)
                 return BadRequest(new { success = false, message = "OccurredAt phải là thời điểm hợp lệ." });
+
+            var occurredAtUtc = NormalizeToUtc(dto.OccurredAt);
 
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
@@ -97,7 +99,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 Source = dto.Source,
                 BankName = dto.BankName,
                 PackageName = dto.PackageName,
-                OccurredAt = dto.OccurredAt,
+                OccurredAt = occurredAtUtc,
                 CategoryName = dto.CategoryName,
                 Note = dto.Note
             };
@@ -127,6 +129,16 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
             return User.FindFirst("sub")?.Value;
         }
 
+        private static DateTime NormalizeToUtc(DateTime value)
+        {
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => value,
+                DateTimeKind.Local => value.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            };
+        }
+
         private IActionResult HandleDuplicate(Transaction existing, TransactionCreateDto incoming)
         {
             bool isSameData = existing.EventId == incoming.EventId
@@ -135,7 +147,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                            && existing.Source == incoming.Source
                            && existing.BankName == incoming.BankName
                            && existing.PackageName == incoming.PackageName
-                           && existing.OccurredAt == incoming.OccurredAt
+                           && NormalizeToUtc(existing.OccurredAt) == NormalizeToUtc(incoming.OccurredAt)
                            && existing.CategoryName == incoming.CategoryName
                            && existing.Note == incoming.Note;
 

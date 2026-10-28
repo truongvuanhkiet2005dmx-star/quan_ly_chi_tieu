@@ -46,7 +46,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Nhập Firebase ID token theo dạng: Bearer <Firebase ID token>"
+        Description = "Nhập Firebase ID token. Swagger sẽ gửi header Authorization: Bearer <token>."
     });
     options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
@@ -125,6 +125,11 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+else
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseCors("Frontend");

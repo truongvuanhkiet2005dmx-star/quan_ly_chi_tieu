@@ -1,4 +1,4 @@
-# Backend quản lý chi tiêu
+﻿# Backend quản lý chi tiêu
 
 ## Cấu hình Firebase
 
@@ -27,9 +27,9 @@ dotnet build
 dotnet run
 ```
 
-Swagger mặc định: `http://localhost:5104/swagger`.
+Trong môi trường Development, Swagger: `http://localhost:5104/swagger`.
 
-Trong Swagger, chọn nút **Authorize**, nhập Firebase ID token (không cần nhập chữ `Bearer` trong ô Bearer của Swagger), sau đó thử API. Khi gọi bằng HTTP client, gửi header:
+Trong Swagger, chọn nút **Authorize**, nhập Firebase ID token (Swagger tự thêm tiền tố Bearer), sau đó thử API. Khi gọi bằng HTTP client, gửi header:
 
 ```http
 Authorization: Bearer <Firebase ID token>
@@ -40,4 +40,6 @@ Authorization: Bearer <Firebase ID token>
 - `GET /api/transactions`
 - `POST /api/transactions`
 
-SQLite lưu dữ liệu tại `smartmoney.db`. Các file database và WAL được bỏ qua bởi Git.
+`OccurredAt` được chuẩn hóa về UTC trước khi lưu và kiểm tra giao dịch trùng. SQLite lưu dữ liệu tại `smartmoney.db`. Backend chạy EF Core migrations khi khởi động; không xóa database để cập nhật schema.
+
+Các file database, WAL, build output, IDE state và cấu hình secret local đã được bỏ qua bởi Git. Production bật HSTS và HTTPS redirection; Development vẫn cho phép chạy HTTP local.
