@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../core/app_colors.dart';
+import '../core/voice_parser_util.dart';
 import '../database/database_helper.dart';
 import '../services/sync_service.dart';
 import 'bill_scanner_screen.dart';
@@ -24,13 +25,15 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState
     extends State<AddTransactionScreen> {
   String _amount = '0';
-  int _tabIndex = 0;
+  int _tabIndex = 0; // 0: Chi tiêu, 1: Thu nhập, 2: Chuyển khoản
 
   String _selectedCategory = 'Ăn uống';
-  IconData _selectedCategoryIcon = Icons.restaurant;
 
   int? _selectedWalletId;
-  String _selectedWallet = 'Chọn ví';
+  String _selectedWallet = 'Chọn ví nguồn';
+
+  int? _selectedToWalletId;
+  String _selectedToWallet = 'Chọn ví đích';
 
   DateTime _selectedDate = DateTime.now();
   String _note = '';
@@ -85,6 +88,11 @@ class _AddTransactionScreenState
       if (_wallets.isNotEmpty) {
         _selectedWalletId = _wallets.first['id'] as int;
         _selectedWallet = _wallets.first['name'].toString();
+
+        if (_wallets.length > 1) {
+          _selectedToWalletId = _wallets[1]['id'] as int;
+          _selectedToWallet = _wallets[1]['name'].toString();
+        }
       }
     });
   }
@@ -92,24 +100,10 @@ class _AddTransactionScreenState
   String get _formattedAmount {
     if (_amount.isEmpty) return '0';
 
-    final parts = _amount.split('.');
-    final integerPart = parts[0];
+    final cleaned = _amount.replaceAll(',', '').replaceAll('.', '');
+    final number = int.tryParse(cleaned) ?? 0;
 
-    String formattedInteger = '';
-
-    for (int i = integerPart.length - 1, count = 1; i >= 0; i--, count++) {
-      formattedInteger = integerPart[i] + formattedInteger;
-
-      if (count % 3 == 0 && i != 0) {
-        formattedInteger = ',$formattedInteger';
-      }
-    }
-
-    if (parts.length > 1) {
-      return '$formattedInteger.${parts[1]}';
-    }
-
-    return formattedInteger;
+    return _formatMoney(number);
   }
 
   int _getAmount() {
@@ -154,19 +148,10 @@ class _AddTransactionScreenState
 
     if (key == '000') {
       setState(() {
-        if (_amount != '0' && _amount.length < 15) {
+        if (_amount != '0' && _amount.length < 13) {
           _amount += '000';
         }
       });
-      return;
-    }
-
-    if (key == ',') {
-      if (!_amount.contains('.')) {
-        setState(() {
-          _amount += '.';
-        });
-      }
       return;
     }
 
@@ -175,10 +160,15 @@ class _AddTransactionScreenState
       return;
     }
 
+    // F4: VNĐ là số nguyên, bỏ qua phím lẻ hoặc định dạng chuẩn
+    if (key == ',' || key == '.') {
+      return;
+    }
+
     setState(() {
       if (_amount == '0') {
         _amount = key;
-      } else if (_amount.length < 15) {
+      } else if (_amount.length < 13) {
         _amount += key;
       }
     });
@@ -212,7 +202,7 @@ class _AddTransactionScreenState
     }
   }
 
-  Future<void> _showWalletPicker() async {
+  Future<void> _showWalletPicker({bool isTargetWallet = false}) async {
     if (_wallets.isEmpty) return;
 
     await showModalBottomSheet(
@@ -223,11 +213,11 @@ class _AddTransactionScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
-                padding: EdgeInsets.all(20),
+              Padding(
+                padding: const EdgeInsets.all(20),
                 child: Text(
-                  'Chọn ví tài khoản',
-                  style: TextStyle(
+                  isTargetWallet ? 'Chọn ví đích (Nhận tiền)' : 'Chọn ví nguồn (Trừ tiền)',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textDark,
@@ -237,6 +227,12 @@ class _AddTransactionScreenState
               ..._wallets.map(
                     (wallet) {
                   final balance = wallet['balance'] as int;
+                  final walletId = wallet['id'] as int;
+
+                  // Không cho phép chọn trùng 1 ví làm cả nguồn và đích
+                  if (isTargetWallet && walletId == _selectedWalletId) {
+                    return const SizedBox.shrink();
+                  }
 
                   return ListTile(
                     leading: const Icon(
@@ -251,13 +247,18 @@ class _AddTransactionScreenState
                       '${_formatMoney(balance)} đ',
                       style: const TextStyle(color: AppColors.textSub),
                     ),
-                    trailing: wallet['id'] == _selectedWalletId
+                    trailing: (isTargetWallet ? walletId == _selectedToWalletId : walletId == _selectedWalletId)
                         ? const Icon(Icons.check, color: AppColors.primary)
                         : null,
                     onTap: () {
                       setState(() {
-                        _selectedWalletId = wallet['id'] as int;
-                        _selectedWallet = wallet['name'].toString();
+                        if (isTargetWallet) {
+                          _selectedToWalletId = walletId;
+                          _selectedToWallet = wallet['name'].toString();
+                        } else {
+                          _selectedWalletId = walletId;
+                          _selectedWallet = wallet['name'].toString();
+                        }
                       });
                       Navigator.pop(context);
                     },
@@ -300,7 +301,7 @@ class _AddTransactionScreenState
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã nhận số tiền hóa đơn! Bấm nút ✓ màu vàng để lưu trừ tiền ví.'),
+          content: Text('Đã nhận số tiền hóa đơn! Bấm nút ✓ để lưu.'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 3),
         ),
@@ -360,6 +361,17 @@ class _AddTransactionScreenState
 
     if (_userId == null || _selectedWalletId == null) return;
 
+    // F1: Kiểm tra ví đích cho giao dịch Chuyển khoản
+    if (_tabIndex == 2 && (_selectedToWalletId == null || _selectedToWalletId == _selectedWalletId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn ví đích khác ví nguồn!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -381,19 +393,57 @@ class _AddTransactionScreenState
         final currentBalance = fromWallet.first['balance'] as int;
 
         if (_tabIndex == 0) {
+          // 0: Chi tiêu -> Trừ ví nguồn
           await txn.update(
             'wallets',
             {'balance': currentBalance - amount},
             where: 'id = ? AND userId = ?',
             whereArgs: [_selectedWalletId, _userId],
           );
-        } else {
+        } else if (_tabIndex == 1) {
+          // 1: Thu nhập -> Cộng ví nguồn
           await txn.update(
             'wallets',
             {'balance': currentBalance + amount},
             where: 'id = ? AND userId = ?',
             whereArgs: [_selectedWalletId, _userId],
           );
+        } else if (_tabIndex == 2) {
+          // 2: Chuyển khoản -> Trừ ví nguồn, cộng ví đích
+          await txn.update(
+            'wallets',
+            {'balance': currentBalance - amount},
+            where: 'id = ? AND userId = ?',
+            whereArgs: [_selectedWalletId, _userId],
+          );
+
+          final toWallet = await txn.query(
+            'wallets',
+            where: 'id = ? AND userId = ?',
+            whereArgs: [_selectedToWalletId, _userId],
+            limit: 1,
+          );
+
+          if (toWallet.isNotEmpty) {
+            final targetBalance = toWallet.first['balance'] as int;
+            await txn.update(
+              'wallets',
+              {'balance': targetBalance + amount},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [_selectedToWalletId, _userId],
+            );
+          }
+        }
+
+        String typeStr = 'expense';
+        int isExpenseVal = 1;
+
+        if (_tabIndex == 1) {
+          typeStr = 'income';
+          isExpenseVal = 0;
+        } else if (_tabIndex == 2) {
+          typeStr = 'transfer';
+          isExpenseVal = 0;
         }
 
         insertedId = await txn.insert(
@@ -401,11 +451,11 @@ class _AddTransactionScreenState
           {
             'userId': _userId,
             'walletId': _selectedWalletId,
-            'toWalletId': null,
+            'toWalletId': _tabIndex == 2 ? _selectedToWalletId : null,
             'amount': amount,
-            'type': _tabIndex == 0 ? 'expense' : 'income',
-            'isExpense': _tabIndex == 0 ? 1 : 0,
-            'categoryName': _selectedCategory,
+            'type': typeStr,
+            'isExpense': isExpenseVal,
+            'categoryName': _tabIndex == 2 ? 'Chuyển khoản' : _selectedCategory,
             'date': _selectedDate.toIso8601String(),
             'note': _note,
             'isSynced': 0,
@@ -421,21 +471,23 @@ class _AddTransactionScreenState
         );
       });
 
-      // Thử đồng bộ sang C# backend ngay sau khi lưu SQLite
+      // F13: Await lệnh đồng bộ backend
+      bool isSyncedSuccess = false;
       try {
         final txData = {
           'id': insertedId,
           'eventId': 'tx_$insertedId',
           'amount': amount,
-          'type': _tabIndex == 0 ? 'expense' : 'income',
+          'type': _tabIndex == 0 ? 'expense' : (_tabIndex == 1 ? 'income' : 'transfer'),
           'walletName': _selectedWallet,
           'bankName': _selectedWallet,
           'packageName': '',
-          'categoryName': _selectedCategory,
+          'categoryName': _tabIndex == 2 ? 'Chuyển khoản' : _selectedCategory,
           'date': _selectedDate.toIso8601String(),
           'note': _note,
         };
-        SyncService.instance.syncTransaction(txData);
+        await SyncService.instance.syncTransaction(txData);
+        isSyncedSuccess = true;
       } catch (e) {
         debugPrint("Manual tx sync error: $e");
       }
@@ -443,9 +495,11 @@ class _AddTransactionScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã lưu giao dịch thành công!'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Text(isSyncedSuccess
+              ? 'Đã lưu & đồng bộ thành công!'
+              : 'Đã lưu cục bộ, đang chờ đồng bộ server...'),
+          backgroundColor: isSyncedSuccess ? Colors.green : Colors.orange,
         ),
       );
 
@@ -529,7 +583,7 @@ class _AddTransactionScreenState
       ),
       body: Column(
         children: [
-          // Selector Chi tiêu | Thu nhập
+          // Selector Chi tiêu | Thu nhập | Chuyển khoản
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             padding: const EdgeInsets.all(4),
@@ -546,9 +600,53 @@ class _AddTransactionScreenState
             ),
           ),
 
-          // Lưới chọn danh mục
+          // Lưới chọn danh mục (ẩn khi chuyển khoản)
           Expanded(
-            child: SingleChildScrollView(
+            child: _tabIndex == 2
+                ? Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.swap_horiz, size: 60, color: AppColors.primary),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Chuyển tiền giữa 2 ví tài khoản',
+                    style: TextStyle(color: AppColors.textDark, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Số tiền sẽ được trừ ở Ví nguồn và tự động cộng vào Ví đích.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showWalletPicker(isTargetWallet: false),
+                          icon: const Icon(Icons.upload, color: Colors.redAccent),
+                          label: Text(_selectedWallet, style: const TextStyle(color: AppColors.textDark, fontSize: 12)),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Icon(Icons.arrow_forward, color: AppColors.primary),
+                      ),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showWalletPicker(isTargetWallet: true),
+                          icon: const Icon(Icons.download, color: Colors.greenAccent),
+                          label: Text(_selectedToWallet, style: const TextStyle(color: AppColors.textDark, fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+                : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 children: [
@@ -572,7 +670,6 @@ class _AddTransactionScreenState
                         onTap: () {
                           setState(() {
                             _selectedCategory = name;
-                            _selectedCategoryIcon = icon;
                           });
                         },
                         child: Column(
@@ -616,7 +713,7 @@ class _AddTransactionScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
-                      onTap: _showWalletPicker,
+                      onTap: () => _showWalletPicker(isTargetWallet: false),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
@@ -684,21 +781,21 @@ class _AddTransactionScreenState
             ),
           ),
 
-          // Bàn phím Máy tính 4x4 Nâng Cao khỏi thanh Android
+          // Bàn phím Máy tính
           Container(
             color: AppColors.card,
             padding: EdgeInsets.only(
               left: 8,
               right: 8,
               top: 8,
-              bottom: bottomInset + 16, // Nâng hàng phím dưới lên khỏi thanh điều hướng máy
+              bottom: bottomInset + 16,
             ),
             child: Column(
               children: [
                 _buildKeypadRow(['7', '8', '9', 'Hôm nay']),
                 _buildKeypadRow(['4', '5', '6', '+']),
-                _buildKeypadRow(['1', '2', '3', ',']),
-                _buildKeypadRow(['0', '000', '⌫', '✓']),
+                _buildKeypadRow(['1', '2', '3', '000']),
+                _buildKeypadRow(['0', '⌫', '✓']),
               ],
             ),
           ),
@@ -741,7 +838,7 @@ class _AddTransactionScreenState
     return Row(
       children: keys.map((key) {
         final isSave = key == '✓';
-        final isAction = key == 'Hôm nay' || key == '+' || key == ',';
+        final isAction = key == 'Hôm nay' || key == '+';
 
         return Expanded(
           child: Padding(
@@ -874,74 +971,11 @@ class _VoiceInputModalState extends State<_VoiceInputModal> {
       return;
     }
 
-    final amount = _parseVietnameseAmount(_liveText);
-    final category = _parseCategory(_liveText);
+    // F9: Sử dụng VoiceParserUtil thống nhất
+    final parsed = VoiceParserUtil.parseVoiceInput(_liveText);
 
-    widget.onVoiceParsed(amount, category, _liveText);
+    widget.onVoiceParsed(parsed['amount'] as int?, parsed['category'] as String?, parsed['note'] as String?);
     Navigator.pop(context);
-  }
-
-  int? _parseVietnameseAmount(String text) {
-    String lower = text.toLowerCase();
-
-    // 1. Mẫu: "50k", "50 nghìn", "50 ngàn"
-    RegExp kRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(k|nghìn|ngàn)', caseSensitive: false);
-    var kMatch = kRegex.firstMatch(lower);
-    if (kMatch != null) {
-      double num = double.tryParse(kMatch.group(1)!.replaceAll(',', '.')) ?? 0;
-      return (num * 1000).round();
-    }
-
-    // 2. Mẫu: "15 triệu", "1.5 triệu"
-    RegExp trieuRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(triệu|tr\b)', caseSensitive: false);
-    var trieuMatch = trieuRegex.firstMatch(lower);
-    if (trieuMatch != null) {
-      double num = double.tryParse(trieuMatch.group(1)!.replaceAll(',', '.')) ?? 0;
-      return (num * 1000000).round();
-    }
-
-    // 3. Mẫu: "200 trăm nghìn"
-    RegExp tramNghinRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(trăm nghìn|trăm ngàn)', caseSensitive: false);
-    var tramNghinMatch = tramNghinRegex.firstMatch(lower);
-    if (tramNghinMatch != null) {
-      double num = double.tryParse(tramNghinMatch.group(1)!.replaceAll(',', '.')) ?? 0;
-      return (num * 100000).round();
-    }
-
-    // 4. Số nguyên tự do e.g. "50000"
-    RegExp numRegex = RegExp(r'(\d{4,10})');
-    var numMatch = numRegex.firstMatch(lower);
-    if (numMatch != null) {
-      return int.tryParse(numMatch.group(1)!) ?? 0;
-    }
-
-    return null;
-  }
-
-  String _parseCategory(String text) {
-    String lower = text.toLowerCase();
-    if (lower.contains('ăn') || lower.contains('cà phê') || lower.contains('phở') || lower.contains('cơm') || lower.contains('uống') || lower.contains('trà')) {
-      return 'Đồ ăn';
-    }
-    if (lower.contains('xe') || lower.contains('xăng') || lower.contains('grab') || lower.contains('đi lại') || lower.contains('bus')) {
-      return 'Đi lại';
-    }
-    if (lower.contains('mua') || lower.contains('shopee') || lower.contains('sắm') || lower.contains('quần áo')) {
-      return 'Mua sắm';
-    }
-    if (lower.contains('điện thoại') || lower.contains('nạp thẻ') || lower.contains('4g')) {
-      return 'Điện thoại';
-    }
-    if (lower.contains('phim') || lower.contains('xem') || lower.contains('chơi') || lower.contains('game')) {
-      return 'Giải trí';
-    }
-    if (lower.contains('học') || lower.contains('sách') || lower.contains('trường')) {
-      return 'Giáo dục';
-    }
-    if (lower.contains('lương') || lower.contains('thưởng')) {
-      return 'Lương';
-    }
-    return 'Khác';
   }
 
   @override
@@ -1008,7 +1042,6 @@ class _VoiceInputModalState extends State<_VoiceInputModal> {
           ),
           const SizedBox(height: 20),
 
-          // Vùng hiển thị văn bản thời gian thực (Live Transcription)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -1036,7 +1069,6 @@ class _VoiceInputModalState extends State<_VoiceInputModal> {
 
           const SizedBox(height: 20),
 
-          // Nút Micro thu âm
           GestureDetector(
             onTap: () {
               if (_isListening) {

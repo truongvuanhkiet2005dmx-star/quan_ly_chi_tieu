@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -19,6 +20,7 @@ class _BillScannerScreenState
   final ImagePicker _picker = ImagePicker();
 
   File? _imageFile;
+  String? _webImagePath;
   bool _isScanning = false;
 
   @override
@@ -51,21 +53,27 @@ class _BillScannerScreenState
       if (pickedFile == null) return;
 
       setState(() {
-        _imageFile = File(pickedFile.path);
+        if (kIsWeb) {
+          _webImagePath = pickedFile.path;
+        } else {
+          _imageFile = File(pickedFile.path);
+        }
         _isScanning = true;
       });
 
-      final inputImage = InputImage.fromFilePath(pickedFile.path);
+      String extractedText = '';
 
-      final textRecognizer = TextRecognizer(
-        script: TextRecognitionScript.latin,
-      );
+      if (!kIsWeb) {
+        final inputImage = InputImage.fromFilePath(pickedFile.path);
+        final textRecognizer = TextRecognizer(
+          script: TextRecognitionScript.latin,
+        );
+        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+        extractedText = recognizedText.text;
+        await textRecognizer.close();
+      }
 
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-
-      final extractedAmount = _extractMoneyFromText(recognizedText.text);
-
-      await textRecognizer.close();
+      final extractedAmount = _extractMoneyFromText(extractedText);
 
       if (!mounted) return;
 
@@ -102,6 +110,7 @@ class _BillScannerScreenState
   }
 
   String _extractMoneyFromText(String text) {
+    if (text.isEmpty) return '0';
     final lines = text.split('\n');
 
     final totalKeywords = [
@@ -118,7 +127,6 @@ class _BillScannerScreenState
 
     final numberRegex = RegExp(r'(?<!\d)(?:\d{1,3}(?:[.,]\d{3})+|\d{4,})(?!\d)');
 
-    // 1. Quét theo dòng có từ khóa Tổng tiền
     for (final line in lines) {
       final normalizedLine = _removeAccents(line.toLowerCase());
 
@@ -145,7 +153,6 @@ class _BillScannerScreenState
       }
     }
 
-    // 2. Nếu không tìm thấy dòng từ khóa, quét tất cả số không thuộc dòng rác
     final List<int> validAmounts = [];
     for (final line in lines) {
       final normalizedLine = _removeAccents(line.toLowerCase());
@@ -259,6 +266,7 @@ class _BillScannerScreenState
                 Navigator.pop(context);
                 setState(() {
                   _imageFile = null;
+                  _webImagePath = null;
                 });
                 _processImage(ImageSource.camera);
               },
@@ -338,10 +346,17 @@ class _BillScannerScreenState
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          if (_imageFile != null)
+          if (_imageFile != null && !kIsWeb)
             Positioned.fill(
               child: Image.file(
                 _imageFile!,
+                fit: BoxFit.cover,
+              ),
+            )
+          else if (_webImagePath != null && kIsWeb)
+            Positioned.fill(
+              child: Image.network(
+                _webImagePath!,
                 fit: BoxFit.cover,
               ),
             )

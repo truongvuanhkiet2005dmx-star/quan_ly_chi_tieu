@@ -34,7 +34,6 @@ class _MainNavigationScreenState
   @override
   void initState() {
     super.initState();
-    // F16: Khởi tạo dịch vụ tự động đọc SMS/Notification sau khi đăng nhập thành công
     AutoTransactionService.instance.initialize();
   }
 
@@ -105,7 +104,6 @@ class _MainNavigationScreenState
     String lower = text.toLowerCase();
     int amount = 0;
 
-    // 1. Check shorthand numbers e.g. 50k, 100k, 20k
     final kRegex = RegExp(r'(\d+)\s*k\b', caseSensitive: false);
     final kMatch = kRegex.firstMatch(lower);
     if (kMatch != null) {
@@ -113,7 +111,6 @@ class _MainNavigationScreenState
       amount = base * 1000;
     }
 
-    // 2. Check million shorthand e.g. 1.5 triệu, 2 triệu
     if (amount == 0) {
       final trieuRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*triệu', caseSensitive: false);
       final trieuMatch = trieuRegex.firstMatch(lower);
@@ -123,7 +120,6 @@ class _MainNavigationScreenState
       }
     }
 
-    // 3. Check raw digits e.g. 50000, 100000
     if (amount == 0) {
       final digitRegex = RegExp(r'(\d{4,10})');
       final digitMatch = digitRegex.firstMatch(lower);
@@ -132,7 +128,6 @@ class _MainNavigationScreenState
       }
     }
 
-    // 4. Check Vietnamese word numbers
     if (amount == 0) {
       if (lower.contains('ngàn') || lower.contains('nghìn')) {
         int baseMultiplier = 1000;
@@ -180,7 +175,6 @@ class _MainNavigationScreenState
       }
     }
 
-    // Clean note text by stripping out number words
     String note = text
         .replaceAll(RegExp(r'\b\d+\s*k\b', caseSensitive: false), '')
         .replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*triệu\b', caseSensitive: false), '')
@@ -598,7 +592,12 @@ class _MainNavigationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: _screens[_currentIndex],
+
+      // F7 Fix: Dùng IndexedStack để giữ nguyên trạng thái scroll & filter của cả 4 tab
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
 
       floatingActionButton: SizedBox(
         width: 54,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../core/app_colors.dart';
 import 'welcome_setup_screen.dart';
 import 'savings_screen.dart';
@@ -83,6 +85,15 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _logout() async {
+    // F10 Fix: Đăng xuất triệt để cả phiên Firebase Auth lẫn Google Sign-In
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.remove('isLoggedIn');
