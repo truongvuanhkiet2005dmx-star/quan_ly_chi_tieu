@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:telephony/telephony.dart';
 import '../core/app_colors.dart';
 import '../services/auto_transaction_service.dart';
+import '../services/native_listener_bridge.dart';
 
 class SmsListScreen extends StatefulWidget {
   const SmsListScreen({super.key});
@@ -11,8 +11,7 @@ class SmsListScreen extends StatefulWidget {
 }
 
 class _SmsListScreenState extends State<SmsListScreen> {
-  final Telephony telephony = Telephony.instance;
-  List<SmsMessage> _messages = [];
+  List<Map<String, String>> _messages = [];
   bool _isLoading = true;
 
   final List<Map<String, String>> _sampleBankNotifications = [
@@ -47,11 +46,7 @@ class _SmsListScreenState extends State<SmsListScreen> {
 
   Future<void> _loadSmsMessages() async {
     try {
-      List<SmsMessage> messages = await telephony.getInboxSms(
-        columns: [SmsColumn.ADDRESS, SmsColumn.BODY, SmsColumn.DATE],
-      );
-
-      messages.sort((a, b) => (b.date ?? 0).compareTo(a.date ?? 0));
+      List<Map<String, String>> messages = await NativeListenerBridge.getInboxSms();
 
       if (!mounted) return;
 
@@ -201,8 +196,8 @@ class _SmsListScreenState extends State<SmsListScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                final body = msg.body ?? '';
-                final sender = msg.address ?? 'Không rõ';
+                final body = msg['body'] ?? '';
+                final sender = msg['address'] ?? 'Không rõ';
 
                 bool isBankSms = body.toLowerCase().contains('vnd') ||
                     body.toLowerCase().contains('đ') ||

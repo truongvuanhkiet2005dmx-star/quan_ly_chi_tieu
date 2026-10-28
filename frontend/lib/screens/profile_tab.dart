@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../core/app_colors.dart';
+import '../services/native_listener_bridge.dart';
 import 'welcome_setup_screen.dart';
 import 'savings_screen.dart';
 
@@ -62,9 +62,9 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Future<void> _openNotificationPermissionSettings() async {
     try {
-      bool? isGranted = await NotificationsListener.hasPermission;
-      if (isGranted != true) {
-        await NotificationsListener.openPermissionSettings();
+      bool isGranted = await NativeListenerBridge.hasNotificationPermission();
+      if (!isGranted) {
+        await NativeListenerBridge.openNotificationPermissionSettings();
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -441,7 +441,6 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
-// F14 Fix: StatefulWidget có dispose() giải phóng TextEditingController chống memory leak
 class _CategoryManagementModal extends StatefulWidget {
   final List<String> categories;
   final Function(String) onCategoryAdded;

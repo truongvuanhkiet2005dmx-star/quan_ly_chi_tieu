@@ -61,6 +61,22 @@ class _BillScannerScreenState
         _isScanning = true;
       });
 
+      // F5 UX Fix: Môi trường Web không hỗ trợ ML Kit On-Device OCR, hiển thị thông báo hướng dẫn thay vì dialog 0đ
+      if (kIsWeb) {
+        if (!mounted) return;
+        setState(() {
+          _isScanning = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tính năng AI Quét Hóa Đơn Camera hỗ trợ tốt nhất trên điện thoại Android & iOS. Vui lòng nhập số tiền trực tiếp trên Web!'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
       String extractedText = '';
 
       if (!kIsWeb) {

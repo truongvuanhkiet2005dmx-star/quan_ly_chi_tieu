@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import '../core/app_colors.dart';
 import '../database/database_helper.dart';
 import '../services/auto_transaction_service.dart';
 import '../services/sync_service.dart';
+import '../services/native_listener_bridge.dart';
 import 'welcome_setup_screen.dart';
 import 'sms_list_screen.dart';
 import 'calendar_tab.dart';
@@ -53,7 +53,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // F15 Fix: Throttle 5s tránh gọi DB/Permission lặp lại liên tục khi app resume
       if (_lastLoadTime != null && DateTime.now().difference(_lastLoadTime!) < const Duration(seconds: 5)) {
         return;
       }
@@ -69,10 +68,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     });
 
     try {
-      bool? isGranted = await NotificationsListener.hasPermission;
+      bool isGranted = await NativeListenerBridge.hasNotificationPermission();
       if (mounted) {
         setState(() {
-          _hasNotificationPermission = isGranted == true;
+          _hasNotificationPermission = isGranted;
         });
       }
     } catch (_) {}
@@ -96,7 +95,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       balance += ((w['balance'] as num?)?.toInt() ?? 0);
     }
 
-    // F3 Fix: Tính tổng thu/chi trực tiếp từ CSDL không phụ thuộc limit danh sách 50 giao dịch
     final totalIncome = await DatabaseHelper.instance.getTotalIncome(userId);
     final totalExpense = await DatabaseHelper.instance.getTotalExpense(userId);
 
@@ -151,7 +149,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             ),
             onPressed: () async {
-              await NotificationsListener.openPermissionSettings();
+              await NativeListenerBridge.openNotificationPermissionSettings();
               _loadHomeData();
             },
             child: const Text('Bật ngay', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
