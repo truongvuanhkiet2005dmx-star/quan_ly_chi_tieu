@@ -134,7 +134,7 @@ Flutter Web cần origin khớp địa chỉ truy cập trình duyệt trong c�
 ```json
 "CorsOrigins": [
   "http://localhost:3000",
-  "http://10.0.128.222:3000"
+  "http://<IPv4-LAN>:3000"
 ]
 ```
 
@@ -142,10 +142,10 @@ Có thể dùng biến môi trường:
 
 ```powershell
 $env:CorsOrigins__0 = "http://localhost:3000"
-$env:CorsOrigins__1 = "http://10.0.128.222:3000"
+$env:CorsOrigins__1 = "http://<IPv4-LAN>:3000"
 dotnet run --launch-profile http
 ```
 
-Thay `10.0.128.222` bằng IPv4 LAN thực tế nếu địa chỉ mạng thay đổi. CORS chủ yếu ảnh hưởng Flutter Web; Android/iOS không dùng CORS của trình duyệt.
+Thay `<IPv4-LAN>` bằng địa chỉ IPv4 LAN thực tế của máy chạy backend hoặc Flutter Web nếu truy cập qua mạng. CORS chủ yếu ảnh hưởng Flutter Web; Android/iOS không dùng CORS của trình duyệt.
 
 Production bật HSTS và HTTPS redirect. Development cho phép HTTP qua launch profile hiện có.

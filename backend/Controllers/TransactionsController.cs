@@ -93,8 +93,6 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 return BadRequest(new { success = false, message = "OccurredAt phải là thời điểm hợp lệ." });
 
             var occurredAtUtc = dto.OccurredAt.UtcDateTime;
-            var normalizedType = dto.Type.Trim().ToLowerInvariant();
-
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
 
@@ -110,7 +108,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 Uid = uid,
                 EventId = dto.EventId,
                 Amount = dto.Amount,
-                Type = normalizedType,
+                Type = dto.Type.Trim(),
                 Source = dto.Source,
                 BankName = dto.BankName,
                 PackageName = dto.PackageName,

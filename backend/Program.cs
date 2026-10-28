@@ -76,15 +76,6 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connect
 var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>()
     ?? Array.Empty<string>();
 
-if (corsOrigins.Length == 0)
-{
-    using var startupLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
-    startupLoggerFactory.CreateLogger("Startup").LogWarning(
-        "CorsOrigins rỗng — đang dùng origin mặc định (localhost only). " +
-        "Frontend chạy trên IP LAN sẽ không gọi được API. " +
-        "Kiểm tra appsettings.json hoặc set biến môi trường CorsOrigins__0.");
-}
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
