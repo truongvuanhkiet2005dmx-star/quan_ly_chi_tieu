@@ -73,3 +73,4 @@ Thay `10.0.128.222` bằng IPv4 LAN thực tế của máy chạy Flutter Web n�
 
 Các file database, WAL, build output, IDE state và cấu hình secret local đã được bỏ qua bởi Git. Production bật HSTS và HTTPS redirection; Development cho phép chạy HTTP local.
 
+

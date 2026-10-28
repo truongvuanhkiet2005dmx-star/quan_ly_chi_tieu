@@ -8,7 +8,6 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
 {
     [Authorize]
     [ApiController]
-    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
     public class TransactionsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -20,14 +19,21 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
 
         [AllowAnonymous]
         [HttpGet("/health")]
-        public async Task<IActionResult> HealthCheck()
+        public async Task<IActionResult> HealthCheck(CancellationToken cancellationToken)
         {
-            var databaseConnected = await _context.Database.CanConnectAsync();
-            return Ok(new { status = "ok", database = databaseConnected ? "connected" : "disconnected" });
+            var databaseConnected = await _context.Database.CanConnectAsync(cancellationToken);
+            if (!databaseConnected)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { status = "unhealthy", database = "disconnected" });
+            }
+
+            return Ok(new { status = "ok", database = "connected" });
         }
 
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
         [HttpGet("api/transactions")]
-        public async Task<IActionResult> GetTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
         {
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
@@ -35,45 +41,50 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
                 return BadRequest(new { success = false, message = "page phải >= 1 và pageSize từ 1 đến 100." });
 
             var query = _context.Transactions.Where(t => t.Uid == uid);
-            var total = await query.CountAsync();
+            var total = await query.CountAsync(cancellationToken);
             var data = await query
                 .OrderByDescending(t => t.OccurredAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return Ok(new { page, pageSize, total, data });
         }
 
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
         [HttpGet("api/transactions/{id:int}")]
-        public async Task<IActionResult> GetTransaction(int id)
+        public async Task<IActionResult> GetTransaction(int id, CancellationToken cancellationToken)
         {
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
 
-            var transaction = await _context.Transactions.FirstOrDefaultAsync(t => t.Id == id && t.Uid == uid);
+            var transaction = await _context.Transactions.FirstOrDefaultAsync(
+                t => t.Id == id && t.Uid == uid, cancellationToken);
             return transaction == null
                 ? NotFound(new { success = false, message = "Không tìm thấy giao dịch." })
                 : Ok(transaction);
         }
 
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
         [HttpDelete("api/transactions/{id:int}")]
-        public async Task<IActionResult> DeleteTransaction(int id)
+        public async Task<IActionResult> DeleteTransaction(int id, CancellationToken cancellationToken)
         {
             var uid = GetFirebaseUid();
             if (string.IsNullOrEmpty(uid)) return Unauthorized();
 
-            var transaction = await _context.Transactions.FirstOrDefaultAsync(t => t.Id == id && t.Uid == uid);
+            var transaction = await _context.Transactions.FirstOrDefaultAsync(
+                t => t.Id == id && t.Uid == uid, cancellationToken);
             if (transaction == null)
                 return NotFound(new { success = false, message = "Không tìm thấy giao dịch." });
 
             _context.Transactions.Remove(transaction);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             return Ok(new { success = true, message = "Xóa giao dịch thành công." });
         }
 
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("transactions")]
         [HttpPost("api/transactions")]
-        public async Task<IActionResult> CreateTransaction([FromBody] TransactionCreateDto dto)
+        public async Task<IActionResult> CreateTransaction([FromBody] TransactionCreateDto dto, CancellationToken cancellationToken)
         {
             if (dto.OccurredAt == default || dto.OccurredAt.Year < 1900)
                 return BadRequest(new { success = false, message = "OccurredAt phải là thời điểm hợp lệ." });
@@ -86,7 +97,7 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
 
             // Kiểm tra trùng cấp ứng dụng
             var existingTx = await _context.Transactions
-                .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId);
+                .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId, cancellationToken);
 
             if (existingTx != null)
                 return HandleDuplicate(existingTx);
@@ -108,14 +119,14 @@ namespace Backend_Nhom6_QuanLyChiTieu.Controllers
             try
             {
                 _context.Transactions.Add(newTx);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
                 return Ok(new { success = true, message = "Lưu thành công!" });
             }
             catch (DbUpdateException)
             {
                 // Bắt lỗi race-condition; chỉ trả duplicate khi bản ghi tồn tại.
                 var concurrentTx = await _context.Transactions
-                    .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId);
+                    .FirstOrDefaultAsync(t => t.Uid == uid && t.EventId == dto.EventId, cancellationToken);
 
                 if (concurrentTx != null)
                     return HandleDuplicate(concurrentTx);
