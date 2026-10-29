@@ -1,10 +1,15 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
   static const String googleServerClientId =
       '1012237002765-669qvmkevs7p6dclujhd0tm2ofab0kkb.apps.googleusercontent.com';
 
+  // F25 Fix: Tự động nhận diện host phù hợp cho Web / Desktop / Android Emulator
   static const String backendBaseUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://10.0.2.2:5104/api/transactions',
+    defaultValue: kIsWeb
+        ? 'http://localhost:5104/api/transactions'
+        : 'http://10.0.2.2:5104/api/transactions',
   );
 
   static const List<String> allowedBankPackages = [

@@ -467,6 +467,8 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
   @override
   Widget build(BuildContext context) {
     final walletId = widget.wallet['id'] as int;
+    final oldBalance = (widget.wallet['balance'] as num?)?.toInt() ?? 0;
+    final userId = widget.wallet['userId'] as int?;
 
     return AlertDialog(
       backgroundColor: AppColors.card,
@@ -539,17 +541,32 @@ class _EditWalletDialogState extends State<_EditWalletDialog> {
           onPressed: () async {
             final name = _nameController.text.trim();
             final balanceText = _balanceController.text.replaceAll(',', '').replaceAll('.', '').trim();
-            final balance = int.tryParse(balanceText) ?? 0;
+            final newBalance = int.tryParse(balanceText) ?? 0;
             final accNum = _accountNumberController.text.trim();
 
             if (name.isEmpty) return;
 
             await DatabaseHelper.instance.updateWallet(walletId, {
               'name': name,
-              'balance': balance,
+              'balance': newBalance,
               'type': _type,
               'accountNumber': accNum.isEmpty ? null : accNum,
             });
+
+            // F15 Fix: Tự động tạo giao dịch điều chỉnh số dư đối ứng để lịch sử giao dịch khớp 100% với số dư
+            final diff = newBalance - oldBalance;
+            if (diff != 0 && userId != null) {
+              await DatabaseHelper.instance.insertTransaction({
+                'userId': userId,
+                'walletId': walletId,
+                'amount': diff.abs(),
+                'type': diff < 0 ? 'expense' : 'income',
+                'isExpense': diff < 0 ? 1 : 0,
+                'categoryName': 'Điều chỉnh số dư',
+                'date': DateTime.now().toIso8601String(),
+                'note': 'Chỉnh sửa số dư ví trực tiếp',
+              });
+            }
 
             if (!mounted) return;
             Navigator.pop(context, true);

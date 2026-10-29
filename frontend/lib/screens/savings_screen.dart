@@ -147,48 +147,108 @@ class _SavingsScreenState extends State<SavingsScreen> {
   }
 
   Future<void> _depositMoneyDialog(Map<String, dynamic> goal) async {
+    if (_userId == null) return;
     final goalId = goal['id'] as int;
     final currentAmount = goal['currentAmount'] as int;
     final amountController = TextEditingController();
 
+    final wallets = await DatabaseHelper.instance.getWallets(_userId!);
+    if (wallets.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa có ví tài khoản để trừ tiền!'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    int selectedWalletId = wallets.first['id'] as int;
+
+    if (!mounted) return;
+
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          title: Text('Nạp tiền vào: ${goal['name']}', style: const TextStyle(color: AppColors.textDark)),
-          content: TextField(
-            controller: amountController,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            style: const TextStyle(color: AppColors.textDark),
-            decoration: const InputDecoration(
-              labelText: 'Số tiền nạp thêm',
-              labelStyle: TextStyle(color: AppColors.textSub),
-              suffixText: 'VNĐ',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy', style: TextStyle(color: AppColors.textSub)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () async {
-                final addAmt = int.tryParse(amountController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
-                if (addAmt <= 0) return;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.card,
+              title: Text('Nạp tiền vào: ${goal['name']}', style: const TextStyle(color: AppColors.textDark)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: selectedWalletId,
+                    dropdownColor: AppColors.card,
+                    style: const TextStyle(color: AppColors.textDark),
+                    decoration: const InputDecoration(
+                      labelText: 'Chọn ví trừ tiền',
+                      labelStyle: TextStyle(color: AppColors.textSub),
+                    ),
+                    items: wallets.map((w) {
+                      return DropdownMenuItem<int>(
+                        value: w['id'] as int,
+                        child: Text('${w['name']} (${w['balance']} đ)', style: const TextStyle(color: AppColors.textDark)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedWalletId = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    style: const TextStyle(color: AppColors.textDark),
+                    decoration: const InputDecoration(
+                      labelText: 'Số tiền nạp thêm',
+                      labelStyle: TextStyle(color: AppColors.textSub),
+                      suffixText: 'VNĐ',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy', style: TextStyle(color: AppColors.textSub)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                  onPressed: () async {
+                    final addAmt = int.tryParse(amountController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
+                    if (addAmt <= 0) return;
 
-                final newAmount = currentAmount + addAmt;
-                await DatabaseHelper.instance.updateSavingsGoalAmount(goalId, newAmount);
+                    // F14 Fix: Trừ tiền ở ví nguồn và tạo giao dịch chi tiêu tương ứng
+                    final wallet = await DatabaseHelper.instance.getWalletById(selectedWalletId);
+                    if (wallet != null) {
+                      final currentWalletBal = (wallet['balance'] as num?)?.toInt() ?? 0;
+                      await DatabaseHelper.instance.updateWalletBalance(selectedWalletId, currentWalletBal - addAmt);
 
-                if (!mounted) return;
-                Navigator.pop(context);
-                _loadSavingsGoals();
-              },
-              child: const Text('Nạp tiền', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            ),
-          ],
+                      await DatabaseHelper.instance.insertTransaction({
+                        'userId': _userId,
+                        'walletId': selectedWalletId,
+                        'amount': addAmt,
+                        'type': 'expense',
+                        'isExpense': 1,
+                        'categoryName': 'Tiết kiệm',
+                        'date': DateTime.now().toIso8601String(),
+                        'note': 'Nạp vào hũ: ${goal['name']}',
+                      });
+                    }
+
+                    final newAmount = currentAmount + addAmt;
+                    await DatabaseHelper.instance.updateSavingsGoalAmount(goalId, newAmount);
+
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    _loadSavingsGoals();
+                  },
+                  child: const Text('Nạp tiền', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
         );
       },
     );

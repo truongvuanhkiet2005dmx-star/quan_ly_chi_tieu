@@ -28,7 +28,8 @@ class _AddTransactionScreenState
   String _amount = '0';
   int _tabIndex = 0; // 0: Chi tiêu, 1: Thu nhập, 2: Chuyển khoản
 
-  String _selectedCategory = 'Ăn uống';
+  // F2 Fix: Khớp danh mục mặc định "Đồ ăn" với item trong lưới
+  String _selectedCategory = 'Đồ ăn';
 
   int? _selectedWalletId;
   String _selectedWallet = 'Chọn ví nguồn';
@@ -346,6 +347,17 @@ class _AddTransactionScreenState
   Future<void> _saveTransaction() async {
     if (_isSaving) return;
 
+    // F19 Fix: Thông báo phản hồi rõ ràng khi chưa có userId hoặc chưa chọn ví
+    if (_userId == null || _selectedWalletId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa chọn ví hoặc không tìm thấy tài khoản!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final amount = _getAmount();
 
     if (amount <= 0) {
@@ -357,8 +369,6 @@ class _AddTransactionScreenState
       );
       return;
     }
-
-    if (_userId == null || _selectedWalletId == null) return;
 
     if (_tabIndex == 2 && (_selectedToWalletId == null || _selectedToWalletId == _selectedWalletId)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -466,6 +476,7 @@ class _AddTransactionScreenState
         );
       });
 
+      // F6 Fix: Lấy kết quả đồng bộ C# Backend thực tế
       bool isSyncedSuccess = false;
       try {
         final txData = {
@@ -480,8 +491,7 @@ class _AddTransactionScreenState
           'date': _selectedDate.toIso8601String(),
           'note': _note,
         };
-        await SyncService.instance.syncTransaction(txData);
-        isSyncedSuccess = true;
+        isSyncedSuccess = await SyncService.instance.syncTransaction(txData);
       } catch (e) {
         debugPrint("Manual tx sync error: $e");
       }
@@ -497,7 +507,6 @@ class _AddTransactionScreenState
         ),
       );
 
-      // F2 Fix: Emit event vào Stream để HomeTab, WalletsTab, ReportsTab tự động reload dữ liệu mượt mà
       AutoTransactionService.instance.onTransactionAdded.add(true);
 
       Navigator.pop(context, true);
@@ -520,10 +529,12 @@ class _AddTransactionScreenState
 
   @override
   Widget build(BuildContext context) {
+    // F2 Fix: Thêm 'Hóa đơn' vào danh sách categories chi tiêu trong grid
     final expenseCategories = [
       {'name': 'Đồ ăn', 'icon': Icons.restaurant},
       {'name': 'Đi lại', 'icon': Icons.directions_bus},
       {'name': 'Mua sắm', 'icon': Icons.shopping_bag_outlined},
+      {'name': 'Hóa đơn', 'icon': Icons.receipt_long},
       {'name': 'Điện thoại', 'icon': Icons.phone_android},
       {'name': 'Giải trí', 'icon': Icons.movie_outlined},
       {'name': 'Giáo dục', 'icon': Icons.menu_book},

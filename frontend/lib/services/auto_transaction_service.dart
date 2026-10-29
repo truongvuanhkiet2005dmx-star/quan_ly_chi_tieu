@@ -18,15 +18,13 @@ class AutoTransactionService {
   static bool _initialized = false;
   final Telephony telephony = Telephony.instance;
   final StreamController<bool> onTransactionAdded = StreamController<bool>.broadcast();
-  static final Set<String> _processedCache = {};
+  static final Set<int> _processedCache = {};
 
   void initialize() async {
-    // F1 Fix: Gán _initialized = true ngay lập tức TRƯỚC các câu lệnh await để chặn race-condition gọi lặp
     if (_initialized) {
       debugPrint("[AutoTransactionService] Dịch vụ đã được khởi tạo trước đó. Bỏ qua đăng ký lặp.");
       return;
     }
-    _initialized = true;
 
     try {
       Map<Permission, PermissionStatus> statuses = await [
@@ -42,11 +40,7 @@ class AutoTransactionService {
           onBackgroundMessage: backgroundMessageHandler,
         );
       }
-    } catch (e) {
-      debugPrint("Error initializing SMS listener: $e");
-    }
 
-    try {
       bool? isGranted = await NotificationsListener.hasPermission;
       if (isGranted != true) {
         debugPrint("Notification Listener Permission not granted. Opening settings...");
@@ -58,8 +52,12 @@ class AutoTransactionService {
       NotificationsListener.receivePort?.listen((evt) {
         handleNotificationEvent(evt);
       });
+
+      // F20 Fix: Đặt _initialized = true khi init thành công để cho phép retry nếu có lỗi
+      _initialized = true;
     } catch (e) {
-      debugPrint("Error initializing Notification listener: $e");
+      _initialized = false;
+      debugPrint("Error initializing AutoTransactionService: $e");
     }
   }
 
@@ -78,7 +76,6 @@ class AutoTransactionService {
       text = evt.text ?? '';
       message = evt.message ?? '';
 
-      // F3/F2 Confirmation: Đọc trực tiếp bigText, subText, textLines từ dynamic getter hoặc raw map
       try {
         bigText = (evt as dynamic).bigText?.toString() ?? '';
         subText = (evt as dynamic).subText?.toString() ?? '';
@@ -106,7 +103,6 @@ class AutoTransactionService {
       message = evt;
     }
 
-    // Whitelist app ngân hàng & SMS, chặn app mua sắm/mạng xã hội/Zalo
     if (pkg.isNotEmpty) {
       bool isAllowed = AppConstants.allowedBankPackages.any((allowed) => pkg.contains(allowed));
       if (!isAllowed && !pkg.contains('sms') && !pkg.contains('messaging') && !pkg.contains('mms')) {
@@ -165,7 +161,6 @@ class AutoTransactionService {
 
     String lowerContent = content.toLowerCase();
 
-    // 1. Khớp theo STK
     if (extractedStk != null && extractedStk.isNotEmpty) {
       String cleanExtracted = extractedStk.replaceAll(RegExp(r'[^\d]'), '');
 
@@ -185,7 +180,6 @@ class AutoTransactionService {
       }
     }
 
-    // 2. Khớp theo từ khóa tên ngân hàng
     final bankKeywords = {
       'vietinbank': ['vietinbank', 'ctg', 'vietin', 'vietin bank', 'ipay'],
       'mbbank': ['mb', 'mbbank', 'mb bank', 'mcbank'],
@@ -213,15 +207,7 @@ class AutoTransactionService {
       }
     }
 
-    // 3. Khớp theo loại ví 'bank'
-    for (var wallet in wallets) {
-      if (wallet['type'] == 'bank') {
-        return wallet;
-      }
-    }
-
-    // 4. Nếu không có ví riêng, mặc định chọn ví đầu tiên
-    return wallets.first;
+    return null;
   }
 
   Future<void> processSmsContent(String content, {bool force = false, String packageName = ''}) async {
@@ -231,35 +217,37 @@ class AutoTransactionService {
 
     String lowerContent = content.toLowerCase();
 
-    if (!lowerContent.contains('vnd') &&
-        !lowerContent.contains('đ') &&
-        !lowerContent.contains('d') &&
-        !lowerContent.contains('tai khoan') &&
-        !lowerContent.contains('tk') &&
-        !lowerContent.contains('gd') &&
-        !lowerContent.contains('sd') &&
-        !lowerContent.contains('chuyen') &&
-        !lowerContent.contains('tru') &&
-        !lowerContent.contains('cong') &&
-        !lowerContent.contains('so du')) {
+    // F3 Fix: Xiết chặt bộ lọc SMS ngân hàng chuẩn xác
+    bool isBankMessage = lowerContent.contains('vnd') ||
+        lowerContent.contains('vnđ') ||
+        lowerContent.contains('so du') ||
+        lowerContent.contains('sodu') ||
+        lowerContent.contains('tai khoan') ||
+        lowerContent.contains('tk:') ||
+        lowerContent.contains('gd:') ||
+        lowerContent.contains('ps:') ||
+        lowerContent.contains('sd:');
+
+    if (!isBankMessage) {
       return;
     }
 
-    String cacheKey = content.trim();
+    // F21 Fix: Mã hóa key hashCode để tránh phình SharedPreferences
+    int cacheHash = content.trim().hashCode;
     if (!force) {
       final prefs = await SharedPreferences.getInstance();
       int now = DateTime.now().millisecondsSinceEpoch;
-      int? lastTime = prefs.getInt('dedup_$cacheKey');
+      int? lastTime = prefs.getInt('dedup_$cacheHash');
 
       if (lastTime != null && (now - lastTime) < 10000) {
-        debugPrint("[AutoTransactionService] Bỏ qua thông báo trùng lặp trong cache Isolate: $cacheKey");
+        debugPrint("[AutoTransactionService] Bỏ qua thông báo trùng lặp trong cache: $cacheHash");
         return;
       }
 
-      await prefs.setInt('dedup_$cacheKey', now);
-      _processedCache.add(cacheKey);
+      await prefs.setInt('dedup_$cacheHash', now);
+      _processedCache.add(cacheHash);
       Timer(const Duration(seconds: 10), () {
-        _processedCache.remove(cacheKey);
+        _processedCache.remove(cacheHash);
       });
     }
 
@@ -296,25 +284,16 @@ class AutoTransactionService {
             lowerContent.contains('ps:+') ||
             lowerContent.contains('ps: +') ||
             lowerContent.contains('ck:+') ||
-            lowerContent.contains('ck: +') ||
             lowerContent.contains('cộng') ||
-            lowerContent.contains('cong') ||
-            lowerContent.contains('nhận') ||
-            lowerContent.contains('nhan');
+            lowerContent.contains('nhận');
 
         bool isExpense = !isIncome && (
             isExpenseFromSign ||
                 lowerContent.contains('-') ||
                 lowerContent.contains('trừ') ||
-                lowerContent.contains('tru') ||
                 lowerContent.contains('thanh toan') ||
                 lowerContent.contains('chi') ||
-                lowerContent.contains('rut tien') ||
-                lowerContent.contains('giao dịch -') ||
-                lowerContent.contains('gd: -') ||
-                lowerContent.contains('gd:-') ||
-                lowerContent.contains('ps:-') ||
-                lowerContent.contains('ck:-')
+                lowerContent.contains('rut tien')
         );
 
         await _saveAutoTransaction(amount, isExpense, content, parsedAccountBalance, extractedStk, packageName: packageName);
@@ -335,7 +314,6 @@ class AutoTransactionService {
 
     final db = await DatabaseHelper.instance.database;
 
-    // F3 Confirmation: Khôi phục userId từ Firebase hoặc user gần nhất. Không tự tạo user_auto rác
     if (userId == null) {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.email != null && firebaseUser.email!.isNotEmpty) {
@@ -354,7 +332,6 @@ class AutoTransactionService {
         }
       }
 
-      // F3 Confirmation: Bỏ qua nếu chưa có user trong CSDL, tuyệt đối không tạo user_auto rác
       if (userId == null) {
         debugPrint("[AutoTransactionService] Bỏ qua lưu giao dịch tự động vì chưa có người dùng đăng nhập trong CSDL.");
         return;
@@ -362,13 +339,7 @@ class AutoTransactionService {
     }
 
     final activeUserId = userId;
-
-    // Lấy danh sách ví theo activeUserId
     List<Map<String, dynamic>> wallets = await DatabaseHelper.instance.getWallets(activeUserId);
-
-    if (wallets.isEmpty) {
-      wallets = await db.query('wallets', orderBy: 'id ASC');
-    }
 
     if (wallets.isEmpty) {
       int newWalletId = await db.insert('wallets', {
@@ -390,7 +361,10 @@ class AutoTransactionService {
       ];
     }
 
-    final matchedWallet = findMatchingWallet(wallets, rawContent, extractedStk) ?? wallets.first;
+    // F4 Fix: Khớp đúng ví theo STK hoặc tên ngân hàng. Chỉ ghi đè parsedAccountBalance khi thực sự khớp ví
+    final matchedWalletCandidate = findMatchingWallet(wallets, rawContent, extractedStk);
+    final isExactMatched = matchedWalletCandidate != null;
+    final matchedWallet = matchedWalletCandidate ?? wallets.first;
 
     final walletId = matchedWallet['id'] as int;
     final walletUserId = matchedWallet['userId'] as int? ?? activeUserId;
@@ -406,7 +380,8 @@ class AutoTransactionService {
     int insertedTxId = 0;
     int newBalance;
     await db.transaction((txn) async {
-      if (parsedAccountBalance != null) {
+      // Chỉ ghi đè số dư parsedAccountBalance nếu khớp ví chính xác
+      if (isExactMatched && parsedAccountBalance != null) {
         newBalance = parsedAccountBalance;
       } else {
         newBalance = isExpense ? currentBalance - amount : currentBalance + amount;

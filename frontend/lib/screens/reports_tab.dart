@@ -58,7 +58,6 @@ class _ReportsTabState extends State<ReportsTab> {
 
     for (final tx in transactions) {
       final type = tx['type']?.toString();
-      // F11 Fix: Loại trừ giao dịch chuyển khoản khỏi báo cáo Thu/Chi
       if (type == 'transfer') continue;
 
       final isExpense = tx['isExpense'] == 1;
@@ -155,6 +154,11 @@ class _ReportsTabState extends State<ReportsTab> {
 
     final now = DateTime.now();
 
+    // F5 Fix: Tính giá trị tiến độ thực tế theo hạn mức 10M thay vì gán cứng 0.85
+    final double circleProgress = _totalAmount == 0
+        ? 0.0
+        : (_totalAmount / 10000000.0).clamp(0.05, 1.0);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -246,7 +250,6 @@ class _ReportsTabState extends State<ReportsTab> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    // F2 Fix: Tạo động đủ 12 tháng từ 1 đến 12
                     children: List.generate(12, (i) => i + 1).map((m) {
                       final isSelected = m == _selectedMonth;
                       return GestureDetector(
@@ -290,7 +293,7 @@ class _ReportsTabState extends State<ReportsTab> {
                         width: 170,
                         height: 170,
                         child: CircularProgressIndicator(
-                          value: _totalAmount == 0 ? 0 : 0.85,
+                          value: circleProgress,
                           color: AppColors.primary,
                           backgroundColor: AppColors.surface,
                           strokeWidth: 26,

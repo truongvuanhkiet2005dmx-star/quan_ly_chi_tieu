@@ -87,7 +87,7 @@ class _MainNavigationScreenState
     };
   }
 
-  Future<void> _startVoiceInput() async {
+  Future<void> _startVoiceInput(StateSetter setDialogState) async {
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
       if (!mounted) return;
@@ -129,12 +129,19 @@ class _MainNavigationScreenState
       _isListening = true;
       _recognizedText = '';
     });
+    setDialogState(() {
+      _recognizedText = '';
+    });
 
     await _speech.listen(
       localeId: localeId,
       onResult: (result) {
         if (!mounted) return;
 
+        // F8 Fix: Cập nhật văn bản realtime trực tiếp trong Dialog State
+        setDialogState(() {
+          _recognizedText = result.recognizedWords;
+        });
         setState(() {
           _recognizedText = result.recognizedWords;
         });
@@ -303,7 +310,7 @@ class _MainNavigationScreenState
                       if (_isListening) {
                         await _stopVoiceInput();
                       } else {
-                        await _startVoiceInput();
+                        await _startVoiceInput(setDialogState);
                       }
 
                       setDialogState(() {});
@@ -403,7 +410,6 @@ class _MainNavigationScreenState
         );
       },
     ).whenComplete(() {
-      // F5 Fix: Tự động dừng microphone ngay khi người dùng đóng thoại voice input
       if (_isListening) {
         _stopVoiceInput();
       }

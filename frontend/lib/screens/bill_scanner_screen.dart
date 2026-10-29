@@ -20,7 +20,7 @@ class _BillScannerScreenState
   final ImagePicker _picker = ImagePicker();
 
   File? _imageFile;
-  String? _webImagePath;
+  Uint8List? _webImageBytes;
   bool _isScanning = false;
 
   @override
@@ -52,17 +52,14 @@ class _BillScannerScreenState
 
       if (pickedFile == null) return;
 
-      setState(() {
-        if (kIsWeb) {
-          _webImagePath = pickedFile.path;
-        } else {
-          _imageFile = File(pickedFile.path);
-        }
-        _isScanning = true;
-      });
-
-      // F5 UX Fix: Môi trường Web không hỗ trợ ML Kit On-Device OCR, hiển thị thông báo hướng dẫn thay vì dialog 0đ
       if (kIsWeb) {
+        // F16 Fix: Đọc Uint8List bytes hiển thị trên Web chống broken blob image
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImageBytes = bytes;
+          _isScanning = true;
+        });
+
         if (!mounted) return;
         setState(() {
           _isScanning = false;
@@ -77,17 +74,20 @@ class _BillScannerScreenState
         return;
       }
 
+      setState(() {
+        _imageFile = File(pickedFile.path);
+        _isScanning = true;
+      });
+
       String extractedText = '';
 
-      if (!kIsWeb) {
-        final inputImage = InputImage.fromFilePath(pickedFile.path);
-        final textRecognizer = TextRecognizer(
-          script: TextRecognitionScript.latin,
-        );
-        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-        extractedText = recognizedText.text;
-        await textRecognizer.close();
-      }
+      final inputImage = InputImage.fromFilePath(pickedFile.path);
+      final textRecognizer = TextRecognizer(
+        script: TextRecognitionScript.latin,
+      );
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      extractedText = recognizedText.text;
+      await textRecognizer.close();
 
       final extractedAmount = _extractMoneyFromText(extractedText);
 
@@ -208,12 +208,13 @@ class _BillScannerScreenState
     return result;
   }
 
-  void _showResultDialog(String detectedAmount) {
+  // F17 Fix: Giải phóng TextEditingController chống rò rỉ bộ nhớ
+  void _showResultDialog(String detectedAmount) async {
     final now = DateTime.now();
     final today = '${now.day}/${now.month}/${now.year}';
     final amountController = TextEditingController(text: detectedAmount);
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
@@ -282,7 +283,7 @@ class _BillScannerScreenState
                 Navigator.pop(context);
                 setState(() {
                   _imageFile = null;
-                  _webImagePath = null;
+                  _webImageBytes = null;
                 });
                 _processImage(ImageSource.camera);
               },
@@ -320,6 +321,8 @@ class _BillScannerScreenState
         );
       },
     );
+
+    amountController.dispose();
   }
 
   Widget _buildResultRow(
@@ -369,10 +372,10 @@ class _BillScannerScreenState
                 fit: BoxFit.cover,
               ),
             )
-          else if (_webImagePath != null && kIsWeb)
+          else if (_webImageBytes != null && kIsWeb)
             Positioned.fill(
-              child: Image.network(
-                _webImagePath!,
+              child: Image.memory(
+                _webImageBytes!,
                 fit: BoxFit.cover,
               ),
             )

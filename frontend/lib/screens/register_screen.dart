@@ -50,9 +50,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      User? fbUser;
+      // F10 Fix: Đăng ký CSDL SQLite cục bộ trước để đảm bảo không tạo user mồ côi trên Firebase
+      final userId = await DatabaseHelper.instance.registerUser(
+        username,
+        password,
+      );
 
-      // 1. Thử đăng ký Firebase Auth nếu là email hợp lệ
+      User? fbUser;
       if (username.contains('@')) {
         try {
           final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -62,28 +66,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           fbUser = cred.user;
         } on FirebaseAuthException catch (fe) {
           if (fe.code == 'email-already-in-use') {
-            if (!mounted) return;
-            setState(() { _isLoading = false; });
-            _showSnackBar('Email này đã được đăng ký trên Firebase!', Colors.red);
-            return;
+            debugPrint("[RegisterScreen] Email đã tồn tại trên Firebase, tiếp tục liên kết SQLite.");
           } else if (fe.code == 'weak-password') {
-            if (!mounted) return;
-            setState(() { _isLoading = false; });
-            _showSnackBar('Mật khẩu quá yếu!', Colors.red);
-            return;
-          } else if (fe.code == 'network-request-failed') {
-            debugPrint("[RegisterScreen] Mất mạng. Tiếp tục đăng ký SQLite Cục bộ...");
+            debugPrint("[RegisterScreen] Mật khẩu yếu trên Firebase Auth.");
           }
         } catch (fe) {
-          debugPrint("[RegisterScreen] Lỗi kết nối Firebase Auth (Chế độ Offline): $fe");
+          debugPrint("[RegisterScreen] Không thể kết nối Firebase Auth (Chế độ Offline): $fe");
         }
       }
-
-      // 2. Đăng ký CSDL SQLite cục bộ (mã hóa PBKDF2-HMAC-SHA256)
-      final userId = await DatabaseHelper.instance.registerUser(
-        username,
-        password,
-      );
 
       if (fbUser != null && fbUser.email != null) {
         await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
@@ -160,16 +150,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         throw Exception("Không thể lấy thông tin Email từ Google.");
       }
 
-      // Tìm hoặc tạo tài khoản SQLite tương ứng với Firebase UID chuẩn xác
       final sqliteUser = await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
         firebaseUid: user.uid,
         email: user.email!,
         displayName: user.displayName ?? user.email!,
       );
 
+      final userId = sqliteUser['id'] as int;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isLoggedIn', true);
-      await prefs.setInt('userId', sqliteUser['id'] as int);
+      await prefs.setInt('userId', userId);
       await prefs.setString('username', sqliteUser['username'] as String);
 
       if (!mounted) return;
@@ -178,13 +168,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = false;
       });
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const MainNavigationScreen(),
-        ),
-            (route) => false,
-      );
+      // F9 Fix: Kiểm tra xem user Google đã thiết lập đủ ví chưa. Nếu chưa -> dẫn tới InitialWalletSetupScreen
+      final userWallets = await DatabaseHelper.instance.getWallets(userId);
+      final hasCashWallet = userWallets.any((w) => w['type'] == 'cash');
+
+      if (!hasCashWallet || userWallets.length <= 1) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => InitialWalletSetupScreen(userId: userId),
+          ),
+              (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MainNavigationScreen(),
+          ),
+              (route) => false,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
 

@@ -15,7 +15,7 @@ class VoiceParserUtil {
       amount = (numVal * 1000).round();
     }
 
-    // 2. Shorthand "1.5 triệu", "2 tr"
+    // 2. Shorthand "1.5 triệu", "2 tr", "1 triệu"
     if (amount == 0) {
       final trieuRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(triệu|tr\b)', caseSensitive: false);
       final trieuMatch = trieuRegex.firstMatch(lower);
@@ -44,53 +44,9 @@ class VoiceParserUtil {
       }
     }
 
-    // 5. Vietnamese word numbers e.g. "một trăm hai mươi nghìn"
-    if (amount == 0 && (lower.contains('ngàn') || lower.contains('nghìn') || lower.contains('trăm') || lower.contains('triệu'))) {
-      if (lower.contains('chín trăm')) {
-        amount += 900000;
-      } else if (lower.contains('tám trăm')) {
-        amount += 800000;
-      } else if (lower.contains('bảy trăm')) {
-        amount += 700000;
-      } else if (lower.contains('sáu trăm')) {
-        amount += 600000;
-      } else if (lower.contains('năm trăm')) {
-        amount += 500000;
-      } else if (lower.contains('bốn trăm')) {
-        amount += 400000;
-      } else if (lower.contains('ba trăm')) {
-        amount += 300000;
-      } else if (lower.contains('hai trăm')) {
-        amount += 200000;
-      } else if (lower.contains('một trăm') || lower.contains('trăm')) {
-        amount += 100000;
-      }
-
-      if (lower.contains('chín mươi')) {
-        amount += 90000;
-      } else if (lower.contains('tám mươi')) {
-        amount += 80000;
-      } else if (lower.contains('bảy mươi')) {
-        amount += 70000;
-      } else if (lower.contains('sáu mươi')) {
-        amount += 60000;
-      } else if (lower.contains('năm mươi')) {
-        amount += 50000;
-      } else if (lower.contains('bốn mươi')) {
-        amount += 40000;
-      } else if (lower.contains('ba mươi')) {
-        amount += 30000;
-      } else if (lower.contains('hai mươi')) {
-        amount += 20000;
-      } else if (lower.contains('mười')) {
-        amount += 10000;
-      }
-
-      if (lower.contains('năm ngàn') || lower.contains('năm nghìn')) {
-        amount += 5000;
-      } else if (lower.contains('mười nghìn') || lower.contains('mười ngàn')) {
-        amount += 10000;
-      }
+    // 5. Full Vietnamese word-number parser (Fix #1 & #28)
+    if (amount == 0 && (lower.contains('ngàn') || lower.contains('nghìn') || lower.contains('trăm') || lower.contains('triệu') || lower.contains('mươi') || lower.contains('mười'))) {
+      amount = _parseVietnameseWordsToNumber(lower);
     }
 
     String category = 'Khác';
@@ -113,5 +69,95 @@ class VoiceParserUtil {
       'category': category,
       'note': text,
     };
+  }
+
+  static int _parseVietnameseWordsToNumber(String text) {
+    int total = 0;
+
+    // Phân tách nhánh hàng Triệu
+    if (text.contains('triệu') || text.contains(' tr ')) {
+      final parts = text.split(RegExp(r'triệu|tr\b'));
+      int millions = _parseSubThousand(parts[0]);
+      if (millions == 0) millions = 1; // e.g. "một triệu"
+      total += millions * 1000000;
+
+      if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+        total += _parseSubMillions(parts[1]);
+      }
+      return total;
+    }
+
+    return _parseSubMillions(text);
+  }
+
+  static int _parseSubMillions(String text) {
+    int total = 0;
+    if (text.contains('nghìn') || text.contains('ngàn')) {
+      final parts = text.split(RegExp(r'nghìn|ngàn'));
+      int thousands = _parseSubThousand(parts[0]);
+      if (thousands == 0) thousands = 1;
+      total += thousands * 1000;
+
+      if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+        total += _parseSubThousand(parts[1]);
+      }
+      return total;
+    }
+
+    return _parseSubThousand(text);
+  }
+
+  static int _parseSubThousand(String text) {
+    int sum = 0;
+
+    // Hàng trăm
+    if (text.contains('chín trăm')) sum += 900;
+    else if (text.contains('tám trăm')) sum += 800;
+    else if (text.contains('bảy trăm')) sum += 700;
+    else if (text.contains('sáu trăm')) sum += 600;
+    else if (text.contains('năm trăm')) sum += 500;
+    else if (text.contains('bốn trăm')) sum += 400;
+    else if (text.contains('ba trăm')) sum += 300;
+    else if (text.contains('hai trăm')) sum += 200;
+    else if (text.contains('một trăm') || text.contains('trăm')) sum += 100;
+
+    // Hàng mươi/mười
+    int tens = 0;
+    if (text.contains('chín mươi')) tens = 90;
+    else if (text.contains('tám mươi')) tens = 80;
+    else if (text.contains('bảy mươi')) tens = 70;
+    else if (text.contains('sáu mươi')) tens = 60;
+    else if (text.contains('năm mươi')) tens = 50;
+    else if (text.contains('bốn mươi')) tens = 40;
+    else if (text.contains('ba mươi')) tens = 30;
+    else if (text.contains('hai mươi')) tens = 20;
+    else if (text.contains('mười')) tens = 10;
+
+    sum += tens;
+
+    // Hàng đơn vị (bao gồm "lăm", "năm", "mốt", "hai",...)
+    if (text.contains('lăm') || (tens > 0 && text.contains('năm'))) {
+      sum += 5;
+    } else if (tens == 0 && text.contains('năm')) {
+      sum += 5;
+    } else if (text.contains('chín')) {
+      sum += 9;
+    } else if (text.contains('tám')) {
+      sum += 8;
+    } else if (text.contains('bảy')) {
+      sum += 7;
+    } else if (text.contains('sáu')) {
+      sum += 6;
+    } else if (text.contains('bốn') || text.contains('tư')) {
+      sum += 4;
+    } else if (text.contains('ba')) {
+      sum += 3;
+    } else if (text.contains('hai')) {
+      sum += 2;
+    } else if (text.contains('mốt') || (tens == 0 && (text.contains('một') || text.contains('một')))) {
+      sum += 1;
+    }
+
+    return sum;
   }
 }

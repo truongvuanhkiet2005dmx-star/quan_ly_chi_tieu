@@ -9,10 +9,10 @@ class SyncService {
   static final SyncService instance = SyncService._init();
   SyncService._init();
 
-  // F7: Sử dụng String.fromEnvironment cấu hình URL Backend linh hoạt
   static const String _backendBaseUrl = AppConstants.backendBaseUrl;
 
-  Future<void> syncTransaction(Map<String, dynamic> tx) async {
+  // F6/F22 Fix: Trả về Future<bool> xác nhận kết quả đồng bộ C# Backend chuẩn xác
+  Future<bool> syncTransaction(Map<String, dynamic> tx) async {
     final txId = tx['id'] as int?;
     final eventId = tx['eventId']?.toString().isNotEmpty == true
         ? tx['eventId'].toString()
@@ -22,13 +22,13 @@ class SyncService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         debugPrint("[SyncService] Chưa đăng nhập Firebase Auth. Bỏ qua gửi API cho $eventId (giữ isSynced = 0).");
-        return;
+        return false;
       }
 
       final token = await user.getIdToken();
       if (token == null || token.isEmpty) {
         debugPrint("[SyncService] Không thể lấy Firebase ID Token. Bỏ qua gửi API cho $eventId.");
-        return;
+        return false;
       }
 
       final String type = (tx['type']?.toString().isNotEmpty == true)
@@ -73,11 +73,14 @@ class SyncService {
         if (txId != null) {
           await DatabaseHelper.instance.markTransactionSynced(txId);
         }
+        return true;
       } else {
         debugPrint("[SyncService] Lỗi API Status Code: ${response.statusCode}, Body: ${response.body}");
+        return false;
       }
     } catch (e) {
       debugPrint("[SyncService] Không thể gửi API đồng bộ (Mất mạng / Lỗi kết nối Backend): $e");
+      return false;
     }
   }
 

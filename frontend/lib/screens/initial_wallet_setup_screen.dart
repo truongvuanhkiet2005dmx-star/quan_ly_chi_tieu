@@ -57,20 +57,37 @@ class _InitialWalletSetupScreenState
     });
 
     try {
-      await DatabaseHelper.instance.insertWallet({
-        'userId': widget.userId,
-        'name': 'Tiền mặt',
-        'balance': cash,
-        'type': 'cash',
-      });
+      final existingWallets = await DatabaseHelper.instance.getWallets(widget.userId);
 
-      await DatabaseHelper.instance.insertWallet({
-        'userId': widget.userId,
-        'name': _selectedBank,
-        'balance': bank,
-        'type': 'bank',
-        'accountNumber': accNum.isEmpty ? null : accNum,
-      });
+      // F24 Fix: Cập nhật ví tiền mặt hoặc ví ngân hàng đã có trước đó thay vì chèn ví trùng lặp
+      final existingCash = existingWallets.where((w) => w['type'] == 'cash').firstOrNull;
+      if (existingCash != null) {
+        await DatabaseHelper.instance.updateWalletBalance(existingCash['id'] as int, cash);
+      } else {
+        await DatabaseHelper.instance.insertWallet({
+          'userId': widget.userId,
+          'name': 'Ví tiền mặt',
+          'balance': cash,
+          'type': 'cash',
+        });
+      }
+
+      final existingBank = existingWallets.where((w) => w['type'] == 'bank').firstOrNull;
+      if (existingBank != null) {
+        await DatabaseHelper.instance.updateWallet(existingBank['id'] as int, {
+          'name': _selectedBank,
+          'balance': bank,
+          'accountNumber': accNum.isEmpty ? null : accNum,
+        });
+      } else {
+        await DatabaseHelper.instance.insertWallet({
+          'userId': widget.userId,
+          'name': _selectedBank,
+          'balance': bank,
+          'type': 'bank',
+          'accountNumber': accNum.isEmpty ? null : accNum,
+        });
+      }
 
       if (!mounted) return;
 
@@ -78,11 +95,13 @@ class _InitialWalletSetupScreenState
         _isLoading = false;
       });
 
-      Navigator.pushReplacement(
+      // F3 Fix: Xóa bỏ hoàn toàn màn hình Login/Welcome khỏi back-stack chuyển tiếp mượt mà
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => const MainNavigationScreen(),
         ),
+            (route) => false,
       );
     } catch (e) {
       if (!mounted) return;

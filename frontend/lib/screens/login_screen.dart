@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       User? fbUser;
 
-      // 1. Kiểm tra xác thực Firebase Auth nếu là email chuẩn
+      // 1. Thử xác thực Firebase Auth nếu là email chuẩn
       if (username.contains('@')) {
         try {
           final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -56,32 +56,18 @@ class _LoginScreenState extends State<LoginScreen> {
             password: password,
           );
           fbUser = cred.user;
-        } on FirebaseAuthException catch (fe) {
-          if (fe.code == 'wrong-password' || fe.code == 'invalid-credential') {
-            if (!mounted) return;
-            setState(() { _isLoading = false; });
-            _showSnackBar('Mật khẩu không chính xác!', Colors.red);
-            return;
-          } else if (fe.code == 'user-not-found') {
-            if (!mounted) return;
-            setState(() { _isLoading = false; });
-            _showSnackBar('Tài khoản không tồn tại trên Firebase!', Colors.red);
-            return;
-          } else if (fe.code == 'network-request-failed') {
-            debugPrint("[LoginScreen] Mất mạng. Chuyển sang đăng nhập SQLite Offline...");
-          }
         } catch (fe) {
-          debugPrint("[LoginScreen] Không thể kết nối Firebase Auth (Chế độ Offline): $fe");
+          // F7 Fix: Mất mạng hoặc sai pass trên Firebase vẫn fallback kiểm tra SQLite cục bộ
+          debugPrint("[LoginScreen] Firebase Auth error/offline: $fe. Fallback sang SQLite...");
         }
       }
 
-      // 2. Kiểm tra CSDL SQLite cục bộ (hỗ trợ KDF Salted Hash và Migration tự động)
+      // 2. Kiểm tra CSDL SQLite cục bộ
       var user = await DatabaseHelper.instance.loginUser(
         username,
         password,
       );
 
-      // Nếu có Firebase UID, liên kết tài khoản SQLite với Firebase UID
       if (fbUser != null && fbUser.email != null) {
         user = await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
           firebaseUid: fbUser.uid,
@@ -180,7 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception("Không thể lấy thông tin Email từ Google.");
       }
 
-      // Tìm hoặc tạo tài khoản SQLite tương ứng với Firebase UID chuẩn xác
       final sqliteUser = await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
         firebaseUid: user.uid,
         email: user.email!,

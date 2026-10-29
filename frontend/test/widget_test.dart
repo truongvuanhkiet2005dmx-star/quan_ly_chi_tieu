@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_money_v2/main.dart';
 import 'package:smart_money_v2/services/auto_transaction_service.dart';
 
 void main() {
   testWidgets('Kiểm tra render SmartMoneyApp', (WidgetTester tester) async {
+    // F27 Fix: Thêm setMockInitialValues để ngắt MissingPluginException khi chạy unit test
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const SmartMoneyApp());
     expect(find.byType(SmartMoneyApp), findsOneWidget);
   });

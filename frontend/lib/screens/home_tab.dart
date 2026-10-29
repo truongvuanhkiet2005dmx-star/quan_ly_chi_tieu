@@ -430,8 +430,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                   builder: (context) {
                     final filteredTransactions = _transactions.where((tx) {
                       final isExp = tx['isExpense'] == 1;
-                      if (_selectedFilter == 'Chi') return isExp;
-                      if (_selectedFilter == 'Thu') return !isExp;
+                      final type = tx['type']?.toString();
+                      if (_selectedFilter == 'Chi') return isExp && type != 'transfer';
+                      if (_selectedFilter == 'Thu') return !isExp && type == 'income';
                       return true;
                     }).toList();
 

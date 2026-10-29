@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../core/app_colors.dart';
+import '../core/constants.dart';
 import '../services/native_listener_bridge.dart';
 import 'welcome_setup_screen.dart';
 import 'savings_screen.dart';
@@ -22,7 +23,7 @@ class _ProfileTabState extends State<ProfileTab> {
   String _language = 'Tiếng Việt';
   String _currency = 'VNĐ (₫)';
 
-  final List<String> _customCategories = ['Ăn uống', 'Đi lại', 'Mua sắm', 'Hóa đơn', 'Giải trí', 'Tiền lương', 'Tiền thưởng'];
+  List<String> _customCategories = ['Ăn uống', 'Đi lại', 'Mua sắm', 'Hóa đơn', 'Giải trí', 'Tiền lương', 'Tiền thưởng'];
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedCategories = prefs.getStringList('custom_categories');
 
     if (!mounted) return;
 
@@ -41,7 +43,15 @@ class _ProfileTabState extends State<ProfileTab> {
       _currency = prefs.getString('currency') ?? 'VNĐ (₫)';
       _isBiometricEnabled = prefs.getBool('biometricEnabled') ?? true;
       _isReminderEnabled = prefs.getBool('reminderEnabled') ?? true;
+      if (savedCategories != null && savedCategories.isNotEmpty) {
+        _customCategories = savedCategories;
+      }
     });
+  }
+
+  Future<void> _saveCustomCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('custom_categories', _customCategories);
   }
 
   Future<void> _setBiometric(bool value) async {
@@ -89,8 +99,13 @@ class _ProfileTabState extends State<ProfileTab> {
       await FirebaseAuth.instance.signOut();
     } catch (_) {}
 
+    // F12 Fix: Sign out Google instance đã cấu hình với serverClientId
     try {
-      await GoogleSignIn().signOut();
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email'],
+        serverClientId: AppConstants.googleServerClientId,
+      );
+      await googleSignIn.signOut();
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
@@ -124,6 +139,7 @@ class _ProfileTabState extends State<ProfileTab> {
             setState(() {
               _customCategories.add(newCat);
             });
+            _saveCustomCategories();
           },
         );
       },

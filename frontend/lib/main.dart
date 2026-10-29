@@ -32,8 +32,16 @@ void main() async {
   runApp(const SmartMoneyApp());
 }
 
-class SmartMoneyApp extends StatelessWidget {
+class SmartMoneyApp extends StatefulWidget {
   const SmartMoneyApp({super.key});
+
+  @override
+  State<SmartMoneyApp> createState() => _SmartMoneyAppState();
+}
+
+class _SmartMoneyAppState extends State<SmartMoneyApp> {
+  // F13 Fix: Lưu trữ _startScreenFuture trong State tránh flash loading mỗi khi rebuild widget
+  late final Future<Widget> _startScreenFuture = _getStartScreen();
 
   Future<Widget> _getStartScreen() async {
     final prefs = await SharedPreferences.getInstance();
@@ -60,7 +68,7 @@ class SmartMoneyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: FutureBuilder<Widget>(
-        future: _getStartScreen(),
+        future: _startScreenFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(

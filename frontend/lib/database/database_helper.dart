@@ -34,7 +34,7 @@ class DatabaseHelper {
     return base64Url.encode(values);
   }
 
-  String pbkdf2HmacSha256(String password, String saltString, {int iterations = 10000}) {
+  String pbkdf2HmacSha256(String password, String saltString, {int iterations = 100000}) {
     final List<int> passwordBytes = utf8.encode(password);
     final List<int> saltBytes = utf8.encode(saltString);
 

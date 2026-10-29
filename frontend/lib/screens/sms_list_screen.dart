@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
-import '../services/auto_transaction_service.dart';
 import '../services/native_listener_bridge.dart';
 
 class SmsListScreen extends StatefulWidget {
@@ -17,21 +16,21 @@ class _SmsListScreenState extends State<SmsListScreen> {
   final List<Map<String, String>> _sampleBankNotifications = [
     {
       'bank': 'VietinBank iPay',
-      'title': 'Tin biến động số dư',
+      'title': 'Mẫu mô phỏng biến động số dư',
       'body': 'VietinBank:08/10/2026 01:37\nTK:104880072280\nGD:-10,000 VND\nSDC:1,378,944 VND\nND:MoMo CASHIN 0355680504 150574678098 2009',
       'stk': '104880072280',
       'amount': '-10,000 đ',
     },
     {
       'bank': 'MBBank',
-      'title': 'Biến động tài khoản MB',
+      'title': 'Mẫu mô phỏng tài khoản MB',
       'body': 'MBBank: TK 0123456789 GD:-50,000VND SD:2,100,000VND luc 12:30. ND: Thanh toan qua QR',
       'stk': '0123456789',
       'amount': '-50,000 đ',
     },
     {
       'bank': 'Vietcombank (VCB)',
-      'title': 'VCB Digibank Thông báo',
+      'title': 'Mẫu mô phỏng VCB Digibank',
       'body': 'VCB: SD TK 0071001234567 -20,000 VND luc 15:10. So du 5,200,000 VND. ND: Mua hang Shopee',
       'stk': '0071001234567',
       'amount': '-20,000 đ',
@@ -62,13 +61,13 @@ class _SmsListScreenState extends State<SmsListScreen> {
     }
   }
 
-  Future<void> _syncNotificationText(String content) async {
-    await AutoTransactionService.instance.processSmsContent(content, force: true);
-    if (!mounted) return;
+  // F2 Fix: Hướng dẫn mô phỏng an toàn, tránh tạo giao dịch thật từ mẫu demo
+  void _showSampleSyncDialog(String bankName) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã bóc tách số tiền & tự động trừ tiền ví thành công!'),
-        backgroundColor: Colors.green,
+      SnackBar(
+        content: Text('Đây là thẻ mẫu mô phỏng cho $bankName. Để đồng bộ thông báo thật, hãy dùng nút Sync trên Trang chủ!'),
+        backgroundColor: Colors.amber.shade900,
+        duration: const Duration(seconds: 4),
       ),
     );
   }
@@ -100,7 +99,7 @@ class _SmsListScreenState extends State<SmsListScreen> {
         ),
         body: TabBarView(
           children: [
-            // Tab 1: Notification Listener History & Auto Sync
+            // Tab 1: Mẫu mô phỏng Notification Listener
             ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _sampleBankNotifications.length,
@@ -172,9 +171,9 @@ class _SmsListScreenState extends State<SmsListScreen> {
                               backgroundColor: AppColors.primary,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             ),
-                            onPressed: () => _syncNotificationText(body),
-                            icon: const Icon(Icons.sync, color: Colors.black, size: 16),
-                            label: const Text('Đồng bộ trừ tiền', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                            onPressed: () => _showSampleSyncDialog(bank),
+                            icon: const Icon(Icons.info_outline, color: Colors.black, size: 16),
+                            label: const Text('Xem mô phỏng', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
                           ),
                         ],
                       ),
@@ -184,7 +183,7 @@ class _SmsListScreenState extends State<SmsListScreen> {
               },
             ),
 
-            // Tab 2: SMS Inbox
+            // Tab 2: Hộp thư SMS thực tế
             _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : _messages.isEmpty
@@ -203,10 +202,6 @@ class _SmsListScreenState extends State<SmsListScreen> {
                     body.toLowerCase().contains('đ') ||
                     body.toLowerCase().contains('tai khoan') ||
                     body.toLowerCase().contains('tk');
-
-                String? extractedStk = isBankSms
-                    ? AutoTransactionService.instance.extractAccountNumber(body)
-                    : null;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -241,9 +236,9 @@ class _SmsListScreenState extends State<SmsListScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: AppColors.border),
                               ),
-                              child: Text(
-                                extractedStk != null ? 'STK: $extractedStk' : 'Biến động số dư',
-                                style: const TextStyle(
+                              child: const Text(
+                                'SMS Ngân hàng',
+                                style: TextStyle(
                                   fontSize: 10,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.bold,
@@ -257,17 +252,6 @@ class _SmsListScreenState extends State<SmsListScreen> {
                         body,
                         style: const TextStyle(fontSize: 13, color: AppColors.textDark),
                       ),
-                      if (isBankSms) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () => _syncNotificationText(body),
-                            icon: const Icon(Icons.sync, size: 14, color: AppColors.primary),
-                            label: const Text('Đồng bộ trừ tiền', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 );
