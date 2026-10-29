@@ -1,0 +1,3 @@
+C:/Users/ADMIN/AppData/Local/Pub/Cache/hosted/pub.dev/jni-1.0.3/android/.cxx/Debug/5v65262i/x86/CMakeFiles/jni.dir
+C:/Users/ADMIN/AppData/Local/Pub/Cache/hosted/pub.dev/jni-1.0.3/android/.cxx/Debug/5v65262i/x86/CMakeFiles/edit_cache.dir
+C:/Users/ADMIN/AppData/Local/Pub/Cache/hosted/pub.dev/jni-1.0.3/android/.cxx/Debug/5v65262i/x86/CMakeFiles/rebuild_cache.dir
