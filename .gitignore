@@ -15,23 +15,23 @@ Thumbs.db
 *.temp
 
 # Flutter/Dart
-frontend/.dart_tool/
-frontend/.flutter-plugins
-frontend/.flutter-plugins-dependencies
-frontend/.pub-cache/
-frontend/.pub/
-frontend/build/
-frontend/coverage/
-frontend/**/build/
-frontend/**/.dart_tool/
-frontend/**/.flutter-plugins-dependencies
-frontend/**/doc/api/
-frontend/**/android/app/debug/
-frontend/**/android/app/profile/
-frontend/**/android/app/release/
-frontend/**/ios/Flutter/.last_build_id
-frontend/**/*.symbolicated
-frontend/**/*.obfuscated
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+**/build/
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/doc/api/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/ios/Flutter/.last_build_id
+**/*.symbolicated
+**/*.obfuscated
 
 # ASP.NET Core / C#
 backend/**/bin/
