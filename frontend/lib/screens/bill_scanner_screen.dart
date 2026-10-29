@@ -92,9 +92,17 @@ class _BillScannerScreenState
         _isScanning = false;
       });
 
-      // F1 & F17 Fix: Đọc kết quả từ Dialog, nếu là 'RECAPTURE' thì chụp lại, nếu là số tiền thì pop màn hình về AddTransaction
       final result = await _showResultDialog(extractedAmount);
+
+      // F1 & F12 Fix: Mở khóa cờ _isPickingImage = false và clear ảnh cũ trước khi gọi đệ quy chụp lại
       if (result == 'RECAPTURE') {
+        _isPickingImage = false;
+        if (mounted) {
+          setState(() {
+            _imageFile = null;
+            _webImageBytes = null;
+          });
+        }
         _processImage(ImageSource.camera);
         return;
       }
@@ -118,7 +126,6 @@ class _BillScannerScreenState
         ),
       );
     } finally {
-      // F3 Fix: Bọc finally đảm bảo _isPickingImage luôn được reset về false ngay cả khi catch exception
       _isPickingImage = false;
     }
   }

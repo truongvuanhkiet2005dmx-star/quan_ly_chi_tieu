@@ -16,15 +16,17 @@ class AutoTransactionService {
   AutoTransactionService._();
 
   static bool _initialized = false;
+  static bool _isInitializing = false;
   final Telephony telephony = Telephony.instance;
   final StreamController<bool> onTransactionAdded = StreamController<bool>.broadcast();
   static final Set<int> _processedCache = {};
 
   void initialize() async {
-    if (_initialized) {
-      debugPrint("[AutoTransactionService] Dịch vụ đã được khởi tạo trước đó. Bỏ qua đăng ký lặp.");
+    if (_initialized || _isInitializing) {
+      debugPrint("[AutoTransactionService] Dịch vụ đang khởi tạo hoặc đã khởi tạo trước đó. Bỏ qua.");
       return;
     }
+    _isInitializing = true;
 
     try {
       Map<Permission, PermissionStatus> statuses = await [
@@ -53,11 +55,12 @@ class AutoTransactionService {
         handleNotificationEvent(evt);
       });
 
-      // F20 Fix: Đặt _initialized = true khi init thành công để cho phép retry nếu có lỗi
       _initialized = true;
     } catch (e) {
       _initialized = false;
       debugPrint("Error initializing AutoTransactionService: $e");
+    } finally {
+      _isInitializing = false;
     }
   }
 
@@ -217,22 +220,20 @@ class AutoTransactionService {
 
     String lowerContent = content.toLowerCase();
 
-    // F3 Fix: Xiết chặt bộ lọc SMS ngân hàng chuẩn xác
+    // F6 Fix: Mở rộng nhận diện SMS ngân hàng (không đòi hỏi dấu hai chấm)
     bool isBankMessage = lowerContent.contains('vnd') ||
         lowerContent.contains('vnđ') ||
+        lowerContent.contains('đ') ||
+        lowerContent.contains('đồng') ||
         lowerContent.contains('so du') ||
         lowerContent.contains('sodu') ||
         lowerContent.contains('tai khoan') ||
-        lowerContent.contains('tk:') ||
-        lowerContent.contains('gd:') ||
-        lowerContent.contains('ps:') ||
-        lowerContent.contains('sd:');
+        RegExp(r'\b(?:tk|gd|ps|sd|stk)\b', caseSensitive: false).hasMatch(content);
 
     if (!isBankMessage) {
       return;
     }
 
-    // F21 Fix: Mã hóa key hashCode để tránh phình SharedPreferences
     int cacheHash = content.trim().hashCode;
     if (!force) {
       final prefs = await SharedPreferences.getInstance();
@@ -361,7 +362,6 @@ class AutoTransactionService {
       ];
     }
 
-    // F4 Fix: Khớp đúng ví theo STK hoặc tên ngân hàng. Chỉ ghi đè parsedAccountBalance khi thực sự khớp ví
     final matchedWalletCandidate = findMatchingWallet(wallets, rawContent, extractedStk);
     final isExactMatched = matchedWalletCandidate != null;
     final matchedWallet = matchedWalletCandidate ?? wallets.first;
@@ -378,9 +378,9 @@ class AutoTransactionService {
     }
 
     int insertedTxId = 0;
-    int newBalance;
+    // F13 Fix: Khởi tạo biến newBalance = 0 chuẩn mực
+    int newBalance = 0;
     await db.transaction((txn) async {
-      // Chỉ ghi đè số dư parsedAccountBalance nếu khớp ví chính xác
       if (isExactMatched && parsedAccountBalance != null) {
         newBalance = parsedAccountBalance;
       } else {
