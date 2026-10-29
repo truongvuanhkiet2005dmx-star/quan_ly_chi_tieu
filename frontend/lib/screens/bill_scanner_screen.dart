@@ -94,7 +94,7 @@ class _BillScannerScreenState
 
       final result = await _showResultDialog(extractedAmount);
 
-      // F1 & F12 Fix: Mở khóa cờ _isPickingImage = false và clear ảnh cũ trước khi gọi đệ quy chụp lại
+      // F1 Fix: Thêm await trước _processImage đệ quy để chống double-pick race condition
       if (result == 'RECAPTURE') {
         _isPickingImage = false;
         if (mounted) {
@@ -103,7 +103,7 @@ class _BillScannerScreenState
             _webImageBytes = null;
           });
         }
-        _processImage(ImageSource.camera);
+        await _processImage(ImageSource.camera);
         return;
       }
 

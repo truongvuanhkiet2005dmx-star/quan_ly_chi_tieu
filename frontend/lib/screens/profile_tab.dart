@@ -57,6 +57,7 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _setBiometric(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('biometricEnabled', value);
+    if (!mounted) return;
     setState(() {
       _isBiometricEnabled = value;
     });
@@ -65,6 +66,7 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _setReminder(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('reminderEnabled', value);
+    if (!mounted) return;
     setState(() {
       _isReminderEnabled = value;
     });
@@ -99,7 +101,6 @@ class _ProfileTabState extends State<ProfileTab> {
       await FirebaseAuth.instance.signOut();
     } catch (_) {}
 
-    // F12 Fix: Sign out Google instance đã cấu hình với serverClientId
     try {
       final googleSignIn = GoogleSignIn(
         scopes: ['email'],
@@ -555,6 +556,8 @@ class _FamilyWalletModalState extends State<_FamilyWalletModal> {
 
   Future<void> _loadFamilySettings() async {
     final prefs = await SharedPreferences.getInstance();
+    // F2/F5 Fix: Kiểm tra mounted sau await SharedPreferences trước khi gán .text lên controller
+    if (!mounted) return;
     _budgetController.text = prefs.getString('family_budget') ?? '';
     _emailController.text = prefs.getString('family_email') ?? '';
   }
