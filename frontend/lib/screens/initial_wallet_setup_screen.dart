@@ -60,7 +60,7 @@ class _InitialWalletSetupScreenState
       final existingWallets = await DatabaseHelper.instance.getWallets(widget.userId);
 
       // F24 Fix: Cập nhật ví tiền mặt hoặc ví ngân hàng đã có trước đó thay vì chèn ví trùng lặp
-      final existingCash = existingWallets.where((w) => w['type'] == 'cash').firstOrNull;
+      final existingCash = existingWallets.cast<Map<String, dynamic>?>().firstWhere((w) => w?['type'] == 'cash', orElse: () => null);
       if (existingCash != null) {
         await DatabaseHelper.instance.updateWalletBalance(existingCash['id'] as int, cash);
       } else {
@@ -72,7 +72,7 @@ class _InitialWalletSetupScreenState
         });
       }
 
-      final existingBank = existingWallets.where((w) => w['type'] == 'bank').firstOrNull;
+      final existingBank = existingWallets.cast<Map<String, dynamic>?>().firstWhere((w) => w?['type'] == 'bank', orElse: () => null);
       if (existingBank != null) {
         await DatabaseHelper.instance.updateWallet(existingBank['id'] as int, {
           'name': _selectedBank,

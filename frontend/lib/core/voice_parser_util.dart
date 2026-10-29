@@ -18,7 +18,6 @@ class VoiceParserUtil {
 
     // 2. Shorthand "1.5 triệu", "2 tr", "1 triệu"
     if (amount == 0) {
-      // F3 Fix: Parse số Ả Rập phía trước chữ triệu (Shorthand đã handle tốt)
       final trieuRegex = RegExp(r'(\d+(?:[.,]\d+)?)\s*(triệu|tr(?!\p{L}))', caseSensitive: false, unicode: true);
       final trieuMatch = trieuRegex.firstMatch(lower);
       if (trieuMatch != null) {
@@ -109,64 +108,59 @@ class VoiceParserUtil {
     return _parseSubThousand(text);
   }
 
-  // F2 Fix: Tách token từ từ trái sang phải, không dùng contains gây cộng dồn 
+  // F2 Fix: Tách token từ từ trái sang phải, bóc tách cụm đã khớp để không bao giờ bị cộng dồn trùng lặp
   static int _parseSubThousand(String text) {
     int sum = 0;
     String t = text;
 
-    // Ưu tiên check số Ả rập phía trước (Fix #3 cho chuỗi mix "2 triệu")
     final numMatch = RegExp(r'(\d+)').firstMatch(t);
     if (numMatch != null) {
       return int.tryParse(numMatch.group(1)!) ?? 0;
     }
 
-    // Hàng trăm
-    if (t.contains('chín trăm')) { sum += 900; t = t.replaceFirst('chín trăm', ''); }
-    else if (t.contains('tám trăm')) { sum += 800; t = t.replaceFirst('tám trăm', ''); }
-    else if (t.contains('bảy trăm')) { sum += 700; t = t.replaceFirst('bảy trăm', ''); }
-    else if (t.contains('sáu trăm')) { sum += 600; t = t.replaceFirst('sáu trăm', ''); }
-    else if (t.contains('năm trăm')) { sum += 500; t = t.replaceFirst('năm trăm', ''); }
-    else if (t.contains('bốn trăm')) { sum += 400; t = t.replaceFirst('bốn trăm', ''); }
-    else if (t.contains('ba trăm')) { sum += 300; t = t.replaceFirst('ba trăm', ''); }
-    else if (t.contains('hai trăm')) { sum += 200; t = t.replaceFirst('hai trăm', ''); }
-    else if (t.contains('một trăm')) { sum += 100; t = t.replaceFirst('một trăm', ''); }
-    else if (t.contains('trăm')) { sum += 100; t = t.replaceFirst('trăm', ''); }
+    final hundreds = [
+      ['chín trăm', 900], ['tám trăm', 800], ['bảy trăm', 700], ['sáu trăm', 600],
+      ['năm trăm', 500], ['bốn trăm', 400], ['ba trăm', 300], ['hai trăm', 200],
+      ['một trăm', 100], ['trăm', 100]
+    ];
+    for (var h in hundreds) {
+      if (t.contains(h[0] as String)) {
+        sum += h[1] as int;
+        t = t.replaceFirst(h[0] as String, '');
+        break;
+      }
+    }
 
-    // Hàng mươi/mười
-    int tens = 0;
-    if (t.contains('chín mươi')) { tens = 90; t = t.replaceFirst('chín mươi', ''); }
-    else if (t.contains('tám mươi')) { tens = 80; t = t.replaceFirst('tám mươi', ''); }
-    else if (t.contains('bảy mươi')) { tens = 70; t = t.replaceFirst('bảy mươi', ''); }
-    else if (t.contains('sáu mươi')) { tens = 60; t = t.replaceFirst('sáu mươi', ''); }
-    else if (t.contains('năm mươi')) { tens = 50; t = t.replaceFirst('năm mươi', ''); }
-    else if (t.contains('bốn mươi')) { tens = 40; t = t.replaceFirst('bốn mươi', ''); }
-    else if (t.contains('ba mươi')) { tens = 30; t = t.replaceFirst('ba mươi', ''); }
-    else if (t.contains('hai mươi')) { tens = 20; t = t.replaceFirst('hai mươi', ''); }
-    else if (t.contains('mười')) { tens = 10; t = t.replaceFirst('mười', ''); }
+    final tensList = [
+      ['chín mươi', 90], ['tám mươi', 80], ['bảy mươi', 70], ['sáu mươi', 60],
+      ['năm mươi', 50], ['bốn mươi', 40], ['ba mươi', 30], ['hai mươi', 20],
+      ['mười', 10]
+    ];
+    bool hasTens = false;
+    for (var tens in tensList) {
+      if (t.contains(tens[0] as String)) {
+        sum += tens[1] as int;
+        t = t.replaceFirst(tens[0] as String, '');
+        hasTens = true;
+        break;
+      }
+    }
 
-    sum += tens;
-
-    // Hàng đơn vị (Fix #28 hỗ trợ "lăm")
-    if (t.contains('lăm') || (tens > 0 && t.contains('năm'))) {
-      sum += 5;
-    } else if (tens == 0 && t.contains('năm')) {
-      sum += 5;
-    } else if (t.contains('chín')) {
-      sum += 9;
-    } else if (t.contains('tám')) {
-      sum += 8;
-    } else if (t.contains('bảy')) {
-      sum += 7;
-    } else if (t.contains('sáu')) {
-      sum += 6;
-    } else if (t.contains('bốn') || t.contains('tư')) {
-      sum += 4;
-    } else if (t.contains('ba')) {
-      sum += 3;
-    } else if (t.contains('hai')) {
-      sum += 2;
-    } else if (t.contains('mốt') || (tens == 0 && (t.contains('một')))) {
-      sum += 1;
+    final units = [
+      ['lăm', 5], ['mốt', 1], ['chín', 9], ['tám', 8], ['bảy', 7],
+      ['sáu', 6], ['năm', 5], ['bốn', 4], ['tư', 4], ['ba', 3], ['hai', 2], ['một', 1]
+    ];
+    for (var u in units) {
+      if (t.contains(u[0] as String)) {
+        if (u[0] == 'năm' && !hasTens) {
+          sum += 5;
+        } else if (u[0] != 'năm') {
+          sum += u[1] as int;
+        } else if (hasTens) {
+          sum += 5;
+        }
+        break;
+      }
     }
 
     return sum;
