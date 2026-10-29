@@ -38,7 +38,7 @@ class _MainNavigationScreenState
     AutoTransactionService.instance.initialize();
   }
 
-  List<Widget> get _screens => const [
+  late final List<Widget> _screens = const [
     HomeTab(),
     ReportsTab(),
     WalletsTab(),
@@ -105,15 +105,11 @@ class _MainNavigationScreenState
 
     if (!_speechAvailable) {
       if (!mounted) return;
+      if (!_isDialogOpen) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Không thể khởi động nhận diện giọng nói. Hãy kiểm tra Micro!',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setDialogState(() {
+        _recognizedText = 'Không thể kết nối Micro';
+      });
       return;
     }
 
@@ -126,8 +122,7 @@ class _MainNavigationScreenState
       localeId = 'ja_JP';
     }
 
-    if (!mounted) return;
-    if (!_isDialogOpen) return;
+    if (!mounted || !_isDialogOpen) return;
 
     setState(() {
       _isListening = true;
@@ -244,6 +239,9 @@ class _MainNavigationScreenState
   }
 
   void _showVoiceInputDialog() {
+    // F1 Fix: Gán _isDialogOpen = true khi vừa bật modal bottom sheet
+    _isDialogOpen = true;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -415,6 +413,7 @@ class _MainNavigationScreenState
         );
       },
     ).whenComplete(() {
+      _isDialogOpen = false;
       if (_isListening) {
         _stopVoiceInput();
       }

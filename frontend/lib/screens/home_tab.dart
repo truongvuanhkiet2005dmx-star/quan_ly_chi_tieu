@@ -119,7 +119,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       _isLoading = false;
     });
 
-    SyncService.instance.syncAllPendingTransactions(userId);
+    unawaited(SyncService.instance.syncAllPendingTransactions(userId));
   }
 
   Widget _buildNotificationPermissionBanner() {

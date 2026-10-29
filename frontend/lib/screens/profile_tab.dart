@@ -548,6 +548,18 @@ class _FamilyWalletModalState extends State<_FamilyWalletModal> {
   final _budgetController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadFamilySettings();
+  }
+
+  Future<void> _loadFamilySettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _budgetController.text = prefs.getString('family_budget') ?? '';
+    _emailController.text = prefs.getString('family_email') ?? '';
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _budgetController.dispose();
@@ -589,7 +601,11 @@ class _FamilyWalletModalState extends State<_FamilyWalletModal> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-              onPressed: () {
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('family_budget', _budgetController.text.trim());
+                await prefs.setString('family_email', _emailController.text.trim());
+                if (!mounted) return;
                 Navigator.pop(context);
                 widget.onSaved();
               },

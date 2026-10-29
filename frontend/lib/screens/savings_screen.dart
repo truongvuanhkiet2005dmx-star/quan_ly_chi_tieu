@@ -177,7 +177,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<int>(
-                    value: selectedWalletId,
+                    initialValue: selectedWalletId,
                     dropdownColor: AppColors.card,
                     style: const TextStyle(color: AppColors.textDark),
                     decoration: const InputDecoration(

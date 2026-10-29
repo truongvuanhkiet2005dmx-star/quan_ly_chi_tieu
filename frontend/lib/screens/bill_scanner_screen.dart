@@ -54,15 +54,11 @@ class _BillScannerScreenState
       if (pickedFile == null) return;
 
       if (kIsWeb) {
-        // F16 Fix: Đọc Uint8List bytes hiển thị trên Web chống broken blob image
+        // F16/F4 Fix: Đọc Uint8List bytes và kiểm tra mounted trước khi gọi setState
         final bytes = await pickedFile.readAsBytes();
-        setState(() {
-          _webImageBytes = bytes;
-          _isScanning = true;
-        });
-
         if (!mounted) return;
         setState(() {
+          _webImageBytes = bytes;
           _isScanning = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(

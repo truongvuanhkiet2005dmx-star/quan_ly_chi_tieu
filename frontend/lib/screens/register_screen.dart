@@ -50,13 +50,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      // F10 Fix: Đăng ký CSDL SQLite cục bộ trước để đảm bảo không tạo user mồ côi trên Firebase
-      final userId = await DatabaseHelper.instance.registerUser(
-        username,
-        password,
-      );
-
       User? fbUser;
+
+      // F3 Fix: Kiểm tra & tạo tài khoản Firebase Auth TRƯỚC. Nếu email đã dùng -> ngắt sớm không lưu rác SQLite
       if (username.contains('@')) {
         try {
           final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -71,12 +67,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _showSnackBar('Email này đã được đăng ký trên Firebase! Vui lòng Đăng nhập.', Colors.red);
             return;
           } else if (fe.code == 'weak-password') {
-            debugPrint("[RegisterScreen] Mật khẩu yếu trên Firebase Auth.");
+            if (!mounted) return;
+            setState(() { _isLoading = false; });
+            _showSnackBar('Mật khẩu quá yếu! Hãy dùng ít nhất 6 ký tự.', Colors.red);
+            return;
           }
         } catch (fe) {
-          debugPrint("[RegisterScreen] Không thể kết nối Firebase Auth (Chế độ Offline): $fe");
+          debugPrint("[RegisterScreen] Lỗi kết nối Firebase Auth (Chế độ Offline): $fe");
         }
       }
+
+      // Đăng ký CSDL SQLite cục bộ
+      final userId = await DatabaseHelper.instance.registerUser(
+        username,
+        password,
+      );
 
       if (fbUser != null && fbUser.email != null) {
         await DatabaseHelper.instance.findOrCreateUserByFirebaseUid(
@@ -171,7 +176,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = false;
       });
 
-      // F9 Fix: Kiểm tra xem user Google đã thiết lập đủ ví chưa. Nếu chưa -> dẫn tới InitialWalletSetupScreen
       final userWallets = await DatabaseHelper.instance.getWallets(userId);
       final hasCashWallet = userWallets.any((w) => w['type'] == 'cash');
 
