@@ -117,8 +117,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = false;
       });
 
+      final isDuplicate = e.toString().toLowerCase().contains('unique');
       _showSnackBar(
-        'Tên đăng nhập này đã được sử dụng!',
+        isDuplicate
+            ? 'Tên đăng nhập hoặc Email này đã được sử dụng!'
+            : 'Đăng ký không thành công. Vui lòng thử lại!',
         Colors.red,
       );
     }

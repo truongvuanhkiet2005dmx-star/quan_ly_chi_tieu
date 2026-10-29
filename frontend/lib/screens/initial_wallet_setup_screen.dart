@@ -59,8 +59,8 @@ class _InitialWalletSetupScreenState
     try {
       final existingWallets = await DatabaseHelper.instance.getWallets(widget.userId);
 
-      // F24 Fix: Cập nhật ví tiền mặt hoặc ví ngân hàng đã có trước đó thay vì chèn ví trùng lặp
-      final existingCash = existingWallets.cast<Map<String, dynamic>?>().firstWhere((w) => w?['type'] == 'cash', orElse: () => null);
+      // F5/F13 Fix: Cập nhật ví hiện có, tự động giữ lại STK cũ nếu ô nhập mới để trống
+      final existingCash = existingWallets.where((w) => w['type'] == 'cash').firstOrNull;
       if (existingCash != null) {
         await DatabaseHelper.instance.updateWalletBalance(existingCash['id'] as int, cash);
       } else {
@@ -72,12 +72,14 @@ class _InitialWalletSetupScreenState
         });
       }
 
-      final existingBank = existingWallets.cast<Map<String, dynamic>?>().firstWhere((w) => w?['type'] == 'bank', orElse: () => null);
+      final existingBank = existingWallets.where((w) => w['type'] == 'bank').firstOrNull;
       if (existingBank != null) {
+        final currentAccNum = existingBank['accountNumber']?.toString() ?? '';
+        final finalAccNum = accNum.isNotEmpty ? accNum : currentAccNum;
         await DatabaseHelper.instance.updateWallet(existingBank['id'] as int, {
           'name': _selectedBank,
           'balance': bank,
-          'accountNumber': accNum.isEmpty ? null : accNum,
+          'accountNumber': finalAccNum,
         });
       } else {
         await DatabaseHelper.instance.insertWallet({

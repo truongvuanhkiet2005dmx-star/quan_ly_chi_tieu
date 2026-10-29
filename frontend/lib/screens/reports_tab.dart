@@ -18,6 +18,7 @@ class _ReportsTabState extends State<ReportsTab> {
   bool _isLoading = true;
 
   int _totalAmount = 0;
+  int _monthlyBudget = 10000000;
   Map<String, int> _categoryTotals = {};
 
   StreamSubscription<bool>? _autoTxSub;
@@ -47,6 +48,7 @@ class _ReportsTabState extends State<ReportsTab> {
 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
+    _monthlyBudget = prefs.getInt('monthly_budget') ?? 10000000;
 
     if (userId == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -163,7 +165,7 @@ class _ReportsTabState extends State<ReportsTab> {
 
     final double circleProgress = _totalAmount == 0
         ? 0.0
-        : (_totalAmount / 10000000.0).clamp(0.05, 1.0);
+        : (_totalAmount / _monthlyBudget.toDouble()).clamp(0.05, 1.0);
 
     return Scaffold(
       backgroundColor: AppColors.background,

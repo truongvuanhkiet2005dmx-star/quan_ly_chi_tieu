@@ -216,18 +216,23 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 final text = controller.text.trim();
                 if (text.isNotEmpty) {
                   try {
-                    await AutoTransactionService.instance.processSmsContent(text, force: true);
+                    bool success = await AutoTransactionService.instance.processSmsContent(text, force: true);
                     if (!mounted) return;
                     Navigator.pop(ctx);
                     await _loadHomeData();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã bóc tách & ghi nhận biến động số dư ngân hàng thành công!'), backgroundColor: Colors.green),
+                      SnackBar(
+                        content: Text(success
+                            ? 'Đã bóc tách & ghi nhận biến động số dư thành công!'
+                            : 'Nội dung không chứa thông tin biến động số dư ngân hàng hợp lệ!'),
+                        backgroundColor: success ? Colors.green : Colors.orange,
+                      ),
                     );
                   } catch (e) {
                     if (!mounted) return;
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nội dung không hợp lệ hoặc không tìm thấy ví phù hợp!'), backgroundColor: Colors.red),
+                      const SnackBar(content: Text('Không thể xử lý nội dung này!'), backgroundColor: Colors.red),
                     );
                   }
                 }

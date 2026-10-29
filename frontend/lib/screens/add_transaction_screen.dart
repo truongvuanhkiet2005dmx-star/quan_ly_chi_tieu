@@ -227,45 +227,61 @@ class _AddTransactionScreenState
                   ),
                 ),
               ),
-              // F14 Fix: Lọc loại bỏ ví nguồn khỏi danh sách trước khi render để không để lại khoảng trống SizedBox.shrink() layout
-              ..._wallets.where((wallet) {
-                if (isTargetWallet && (wallet['id'] as int) == _selectedWalletId) {
-                  return false;
-                }
-                return true;
-              }).map(
-                    (wallet) {
-                  final balance = wallet['balance'] as int;
-                  final walletId = wallet['id'] as int;
+              Builder(
+                builder: (context) {
+                  final filteredWallets = _wallets.where((wallet) {
+                    if (isTargetWallet && (wallet['id'] as int) == _selectedWalletId) {
+                      return false;
+                    }
+                    return true;
+                  }).toList();
 
-                  return ListTile(
-                    leading: const Icon(
-                      Icons.account_balance_wallet,
-                      color: AppColors.primary,
-                    ),
-                    title: Text(
-                      wallet['name'].toString(),
-                      style: const TextStyle(color: AppColors.textDark),
-                    ),
-                    subtitle: Text(
-                      '${_formatMoney(balance)} đ',
-                      style: const TextStyle(color: AppColors.textSub),
-                    ),
-                    trailing: (isTargetWallet ? walletId == _selectedToWalletId : walletId == _selectedWalletId)
-                        ? const Icon(Icons.check, color: AppColors.primary)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        if (isTargetWallet) {
-                          _selectedToWalletId = walletId;
-                          _selectedToWallet = wallet['name'].toString();
-                        } else {
-                          _selectedWalletId = walletId;
-                          _selectedWallet = wallet['name'].toString();
-                        }
-                      });
-                      Navigator.pop(context);
-                    },
+                  if (filteredWallets.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text(
+                        'Bạn cần có ít nhất 2 ví để thực hiện chuyển khoản. Hãy tạo thêm ví trong Tab Ví!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: filteredWallets.map((wallet) {
+                      final balance = wallet['balance'] as int;
+                      final walletId = wallet['id'] as int;
+
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.account_balance_wallet,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(
+                          wallet['name'].toString(),
+                          style: const TextStyle(color: AppColors.textDark),
+                        ),
+                        subtitle: Text(
+                          '${_formatMoney(balance)} đ',
+                          style: const TextStyle(color: AppColors.textSub),
+                        ),
+                        trailing: (isTargetWallet ? walletId == _selectedToWalletId : walletId == _selectedWalletId)
+                            ? const Icon(Icons.check, color: AppColors.primary)
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            if (isTargetWallet) {
+                              _selectedToWalletId = walletId;
+                              _selectedToWallet = wallet['name'].toString();
+                            } else {
+                              _selectedWalletId = walletId;
+                              _selectedWallet = wallet['name'].toString();
+                            }
+                          });
+                          Navigator.pop(context);
+                        },
+                      );
+                    }).toList(),
                   );
                 },
               ),

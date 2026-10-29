@@ -213,14 +213,14 @@ class AutoTransactionService {
     return null;
   }
 
-  Future<void> processSmsContent(String content, {bool force = false, String packageName = ''}) async {
+  // F1 Fix: Đổi processSmsContent trả về Future<bool> thông báo thực tế xem có bóc tách & tạo giao dịch thành công không
+  Future<bool> processSmsContent(String content, {bool force = false, String packageName = ''}) async {
     if (!force && (content.contains('SmartMoney') || content.contains('Chi tiêu tự động') || content.contains('Thu nhập tự động'))) {
-      return;
+      return false;
     }
 
     String lowerContent = content.toLowerCase();
 
-    // F6 Fix: Mở rộng nhận diện SMS ngân hàng (không đòi hỏi dấu hai chấm)
     bool isBankMessage = lowerContent.contains('vnd') ||
         lowerContent.contains('vnđ') ||
         lowerContent.contains('đ') ||
@@ -231,7 +231,7 @@ class AutoTransactionService {
         RegExp(r'\b(?:tk|gd|ps|sd|stk)\b', caseSensitive: false).hasMatch(content);
 
     if (!isBankMessage) {
-      return;
+      return false;
     }
 
     int cacheHash = content.trim().hashCode;
@@ -242,7 +242,7 @@ class AutoTransactionService {
 
       if (lastTime != null && (now - lastTime) < 10000) {
         debugPrint("[AutoTransactionService] Bỏ qua thông báo trùng lặp trong cache: $cacheHash");
-        return;
+        return false;
       }
 
       await prefs.setInt('dedup_$cacheHash', now);
@@ -298,8 +298,11 @@ class AutoTransactionService {
         );
 
         await _saveAutoTransaction(amount, isExpense, content, parsedAccountBalance, extractedStk, packageName: packageName);
+        return true;
       }
     }
+
+    return false;
   }
 
   Future<void> _saveAutoTransaction(
@@ -378,7 +381,6 @@ class AutoTransactionService {
     }
 
     int insertedTxId = 0;
-    // F13 Fix: Khởi tạo biến newBalance = 0 chuẩn mực
     int newBalance = 0;
     await db.transaction((txn) async {
       if (isExactMatched && parsedAccountBalance != null) {
