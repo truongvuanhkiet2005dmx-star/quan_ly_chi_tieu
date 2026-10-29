@@ -1,5 +1,0 @@
-# ninja log v5
-15	122	8124923987926670	CMakeFiles/jni.dir/include/dart_api_dl.c.o	97b97503bb0b8153
-0	182	8124923988555678	CMakeFiles/jni.dir/dartjni.c.o	491458491318bb6e
-8	300	8124923989683685	CMakeFiles/jni.dir/third_party/global_jni_env.c.o	b5c70db8ed3b75ad
-301	425	8124923990987697	C:/Users/ADMIN/StudioProjects/smart_money_v2/build/jni/intermediates/cxx/Debug/5v65262i/obj/armeabi-v7a/libdartjni.so	d36df315c15752c6
