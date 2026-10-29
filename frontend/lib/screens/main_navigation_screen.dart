@@ -29,6 +29,7 @@ class _MainNavigationScreenState
 
   bool _speechAvailable = false;
   bool _isListening = false;
+  bool _isDialogOpen = false;
   String _recognizedText = '';
 
   @override
@@ -125,6 +126,9 @@ class _MainNavigationScreenState
       localeId = 'ja_JP';
     }
 
+    if (!mounted) return;
+    if (!_isDialogOpen) return;
+
     setState(() {
       _isListening = true;
       _recognizedText = '';
@@ -136,9 +140,8 @@ class _MainNavigationScreenState
     await _speech.listen(
       localeId: localeId,
       onResult: (result) {
-        if (!mounted) return;
+        if (!mounted || !_isDialogOpen) return;
 
-        // F8 Fix: Cập nhật văn bản realtime trực tiếp trong Dialog State
         setDialogState(() {
           _recognizedText = result.recognizedWords;
         });
@@ -313,7 +316,9 @@ class _MainNavigationScreenState
                         await _startVoiceInput(setDialogState);
                       }
 
-                      setDialogState(() {});
+                      if (_isDialogOpen) {
+                        setDialogState(() {});
+                      }
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),

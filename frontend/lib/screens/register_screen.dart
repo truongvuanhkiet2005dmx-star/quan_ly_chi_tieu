@@ -66,7 +66,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           fbUser = cred.user;
         } on FirebaseAuthException catch (fe) {
           if (fe.code == 'email-already-in-use') {
-            debugPrint("[RegisterScreen] Email đã tồn tại trên Firebase, tiếp tục liên kết SQLite.");
+            if (!mounted) return;
+            setState(() { _isLoading = false; });
+            _showSnackBar('Email này đã được đăng ký trên Firebase! Vui lòng Đăng nhập.', Colors.red);
+            return;
           } else if (fe.code == 'weak-password') {
             debugPrint("[RegisterScreen] Mật khẩu yếu trên Firebase Auth.");
           }

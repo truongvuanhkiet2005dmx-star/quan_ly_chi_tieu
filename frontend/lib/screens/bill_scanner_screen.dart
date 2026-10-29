@@ -21,6 +21,7 @@ class _BillScannerScreenState
 
   File? _imageFile;
   Uint8List? _webImageBytes;
+  bool _isPickingImage = false;
   bool _isScanning = false;
 
   @override
@@ -31,10 +32,6 @@ class _BillScannerScreenState
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _processImage(ImageSource.camera);
-    });
   }
 
   @override
@@ -44,12 +41,16 @@ class _BillScannerScreenState
   }
 
   Future<void> _processImage(ImageSource source) async {
+    if (_isPickingImage) return;
+    _isPickingImage = true;
+
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
         imageQuality: 90,
       );
 
+      _isPickingImage = false;
       if (pickedFile == null) return;
 
       if (kIsWeb) {
@@ -297,7 +298,6 @@ class _BillScannerScreenState
             ElevatedButton(
               onPressed: () {
                 final finalAmount = amountController.text.trim();
-                Navigator.pop(context);
                 Navigator.pop(
                   context,
                   finalAmount.isEmpty ? '0' : finalAmount,

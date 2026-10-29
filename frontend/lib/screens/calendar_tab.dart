@@ -36,38 +36,46 @@ class _CalendarTabState extends State<CalendarTab> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('userId');
 
-    if (userId == null) {
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final transactions = await DatabaseHelper.instance.getAllTransactions(userId);
+
+      final Map<DateTime, List<Map<String, dynamic>>> events = {};
+
+      for (final transaction in transactions) {
+        final date = DateTime.tryParse(transaction['date'].toString());
+        if (date == null) continue;
+
+        final day = _normalizeDate(date);
+        events.putIfAbsent(day, () => []);
+        events[day]!.add(transaction);
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _events.clear();
+        _events.addAll(events);
+        _isLoading = false;
+      });
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
-      return;
     }
-
-    final transactions = await DatabaseHelper.instance.getAllTransactions(userId);
-
-    final Map<DateTime, List<Map<String, dynamic>>> events = {};
-
-    for (final transaction in transactions) {
-      final date = DateTime.tryParse(transaction['date'].toString());
-      if (date == null) continue;
-
-      final day = _normalizeDate(date);
-      events.putIfAbsent(day, () => []);
-      events[day]!.add(transaction);
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _events.clear();
-      _events.addAll(events);
-      _isLoading = false;
-    });
   }
 
   List<Map<String, dynamic>> _getEventsForDay(DateTime day) {

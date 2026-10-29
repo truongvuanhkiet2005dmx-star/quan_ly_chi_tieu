@@ -192,6 +192,9 @@ class DatabaseHelper {
           ALTER TABLE users
           ADD COLUMN firebaseUid TEXT
         ''');
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebaseUid ON users(firebaseUid)
+        ''');
       } catch (_) {}
 
       try {
@@ -262,7 +265,7 @@ class DatabaseHelper {
     }
 
     final sha256Candidate = sha256.convert(utf8.encode(password)).toString();
-    if (storedPassword == password || storedPassword == sha256Candidate) {
+    if (storedPassword == sha256Candidate) {
       final newSalt = generateRandomSalt();
       final newHashedPassword = pbkdf2HmacSha256(password, newSalt);
 

@@ -148,6 +148,8 @@ class _AddTransactionScreenState
       return;
     }
 
+    if (key == '+') return;
+
     if (key == '000') {
       setState(() {
         if (_amount != '0' && _amount.length <= 9) {
@@ -396,7 +398,9 @@ class _AddTransactionScreenState
           limit: 1,
         );
 
-        if (fromWallet.isEmpty) return;
+        if (fromWallet.isEmpty) {
+          throw Exception('Ví nguồn không tồn tại');
+        }
 
         final currentBalance = fromWallet.first['balance'] as int;
 
@@ -1073,16 +1077,20 @@ class _VoiceInputModalState extends State<_VoiceInputModal> {
           const SizedBox(height: 20),
 
           GestureDetector(
-            onTap: () {
+            onTap: _isAvailable
+                ? () {
               if (_isListening) {
                 _stopListening();
               } else {
                 _startListening();
               }
-            },
+            }
+                : null,
             child: CircleAvatar(
               radius: 36,
-              backgroundColor: _isListening ? Colors.redAccent : AppColors.primary,
+              backgroundColor: !_isAvailable
+                  ? Colors.grey
+                  : (_isListening ? Colors.redAccent : AppColors.primary),
               child: Icon(
                 _isListening ? Icons.mic : Icons.mic_none,
                 color: Colors.black,

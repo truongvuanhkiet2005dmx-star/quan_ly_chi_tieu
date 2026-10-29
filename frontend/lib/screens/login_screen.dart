@@ -371,7 +371,19 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final email = _usernameController.text.trim();
+                    if (email.isEmpty || !email.contains('@')) {
+                      _showSnackBar('Vui lòng nhập Email vào ô bên trên để khôi phục!', Colors.orange);
+                      return;
+                    }
+                    try {
+                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                      _showSnackBar('Đã gửi email khôi phục mật khẩu tới $email!', Colors.green);
+                    } catch (e) {
+                      _showSnackBar('Không thể gửi email khôi phục mật khẩu!', Colors.red);
+                    }
+                  },
                   child: const Text(
                     'Quên mật khẩu?',
                     style: TextStyle(

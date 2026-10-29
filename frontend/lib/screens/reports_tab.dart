@@ -48,15 +48,19 @@ class _ReportsTabState extends State<ReportsTab> {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
 
-    if (userId == null) return;
-
-    final transactions = await DatabaseHelper.instance.getAllTransactions(userId);
-    final now = DateTime.now();
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     int total = 0;
     final Map<String, int> categories = {};
 
-    for (final tx in transactions) {
+    try {
+      final transactions = await DatabaseHelper.instance.getAllTransactions(userId);
+      final now = DateTime.now();
+
+      for (final tx in transactions) {
       final type = tx['type']?.toString();
       if (type == 'transfer') continue;
 
@@ -76,13 +80,17 @@ class _ReportsTabState extends State<ReportsTab> {
       }
     }
 
-    if (!mounted) return;
-
-    setState(() {
-      _totalAmount = total;
-      _categoryTotals = categories;
-      _isLoading = false;
-    });
+    } catch (e) {
+      debugPrint("Reports load error: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _totalAmount = total;
+          _categoryTotals = categories;
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   String _formatMoney(int amount) {
