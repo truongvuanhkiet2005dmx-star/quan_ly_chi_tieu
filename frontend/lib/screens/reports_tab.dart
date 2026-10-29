@@ -61,25 +61,24 @@ class _ReportsTabState extends State<ReportsTab> {
       final now = DateTime.now();
 
       for (final tx in transactions) {
-      final type = tx['type']?.toString();
-      if (type == 'transfer') continue;
+        final type = tx['type']?.toString();
+        if (type == 'transfer') continue;
 
-      final isExpense = tx['isExpense'] == 1;
-      if (_modeIndex == 0 && !isExpense) continue;
-      if (_modeIndex == 1 && isExpense) continue;
+        final isExpense = tx['isExpense'] == 1;
+        if (_modeIndex == 0 && !isExpense) continue;
+        if (_modeIndex == 1 && isExpense) continue;
 
-      final date = DateTime.tryParse(tx['date'].toString());
-      if (date == null) continue;
+        final date = DateTime.tryParse(tx['date'].toString());
+        if (date == null) continue;
 
-      if (date.year == now.year && date.month == _selectedMonth) {
-        final amount = (tx['amount'] as num?)?.toInt() ?? 0;
-        final category = tx['categoryName'].toString();
+        if (date.year == now.year && date.month == _selectedMonth) {
+          final amount = (tx['amount'] as num?)?.toInt() ?? 0;
+          final category = tx['categoryName'].toString();
 
-        total += amount;
-        categories[category] = (categories[category] ?? 0) + amount;
+          total += amount;
+          categories[category] = (categories[category] ?? 0) + amount;
+        }
       }
-    }
-
     } catch (e) {
       debugPrint("Reports load error: $e");
     } finally {
@@ -162,7 +161,6 @@ class _ReportsTabState extends State<ReportsTab> {
 
     final now = DateTime.now();
 
-    // F5 Fix: Tính giá trị tiến độ thực tế theo hạn mức 10M thay vì gán cứng 0.85
     final double circleProgress = _totalAmount == 0
         ? 0.0
         : (_totalAmount / 10000000.0).clamp(0.05, 1.0);

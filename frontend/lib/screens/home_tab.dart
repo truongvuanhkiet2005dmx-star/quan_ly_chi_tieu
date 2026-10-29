@@ -81,6 +81,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
     if (userId == null) {
       if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const WelcomeSetupScreen()),

@@ -518,9 +518,10 @@ class _AddTransactionScreenState
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
+      final errorStr = e.toString().replaceAll('Exception: ', '').trim();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không thể lưu giao dịch!'),
+        SnackBar(
+          content: Text(errorStr.isNotEmpty ? errorStr : 'Không thể lưu giao dịch!'),
           backgroundColor: Colors.red,
         ),
       );

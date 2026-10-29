@@ -103,13 +103,15 @@ class _MainNavigationScreenState
 
     _speechAvailable = await _speech.initialize();
 
+    // F1 Fix: Không gán chuỗi lỗi vào _recognizedText khi mic hỏng, tránh hiện nút "Tiếp tục" sai UX
     if (!_speechAvailable) {
       if (!mounted) return;
-      if (!_isDialogOpen) return;
-
-      setDialogState(() {
-        _recognizedText = 'Không thể kết nối Micro';
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể kết nối Micro. Vui lòng kiểm tra lại quyền!'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -239,7 +241,6 @@ class _MainNavigationScreenState
   }
 
   void _showVoiceInputDialog() {
-    // F1 Fix: Gán _isDialogOpen = true khi vừa bật modal bottom sheet
     _isDialogOpen = true;
 
     showModalBottomSheet(
@@ -412,10 +413,11 @@ class _MainNavigationScreenState
           },
         );
       },
-    ).whenComplete(() {
+    ).whenComplete(() async {
+      // F8 Fix: Thêm await khi gọi _stopVoiceInput tránh race condition
       _isDialogOpen = false;
       if (_isListening) {
-        _stopVoiceInput();
+        await _stopVoiceInput();
       }
     });
   }
