@@ -42,7 +42,14 @@ class _WalletsTabState extends State<WalletsTab> {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('userId');
 
-    if (userId == null) return;
+    if (userId == null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     final wallets = await DatabaseHelper.instance.getWallets(userId);
 

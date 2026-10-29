@@ -50,11 +50,9 @@ class _BillScannerScreenState
         imageQuality: 90,
       );
 
-      _isPickingImage = false;
       if (pickedFile == null) return;
 
       if (kIsWeb) {
-        // F16/F4 Fix: Đọc Uint8List bytes và kiểm tra mounted trước khi gọi setState
         final bytes = await pickedFile.readAsBytes();
         if (!mounted) return;
         setState(() {
@@ -94,7 +92,16 @@ class _BillScannerScreenState
         _isScanning = false;
       });
 
-      _showResultDialog(extractedAmount);
+      // F1 & F17 Fix: Đọc kết quả từ Dialog, nếu là 'RECAPTURE' thì chụp lại, nếu là số tiền thì pop màn hình về AddTransaction
+      final result = await _showResultDialog(extractedAmount);
+      if (result == 'RECAPTURE') {
+        _processImage(ImageSource.camera);
+        return;
+      }
+
+      if (result != null && result.isNotEmpty && mounted) {
+        Navigator.pop(context, result);
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -110,6 +117,9 @@ class _BillScannerScreenState
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      // F3 Fix: Bọc finally đảm bảo _isPickingImage luôn được reset về false ngay cả khi catch exception
+      _isPickingImage = false;
     }
   }
 
@@ -205,13 +215,12 @@ class _BillScannerScreenState
     return result;
   }
 
-  // F17 Fix: Giải phóng TextEditingController chống rò rỉ bộ nhớ
-  void _showResultDialog(String detectedAmount) async {
+  Future<String?> _showResultDialog(String detectedAmount) async {
     final now = DateTime.now();
     final today = '${now.day}/${now.month}/${now.year}';
     final amountController = TextEditingController(text: detectedAmount);
 
-    await showDialog(
+    final String? dialogResult = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) {
@@ -277,12 +286,7 @@ class _BillScannerScreenState
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _imageFile = null;
-                  _webImageBytes = null;
-                });
-                _processImage(ImageSource.camera);
+                Navigator.pop(context, 'RECAPTURE');
               },
               child: const Text(
                 'Chụp lại',
@@ -319,6 +323,7 @@ class _BillScannerScreenState
     );
 
     amountController.dispose();
+    return dialogResult;
   }
 
   Widget _buildResultRow(

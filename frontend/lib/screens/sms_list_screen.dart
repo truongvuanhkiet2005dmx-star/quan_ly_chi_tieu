@@ -198,10 +198,12 @@ class _SmsListScreenState extends State<SmsListScreen> {
                 final body = msg['body'] ?? '';
                 final sender = msg['address'] ?? 'Không rõ';
 
+                // F10 Fix: Xiết chặt nhận diện SMS ngân hàng, tránh khớp đơn lẻ chữ đ trong văn bản Tiếng Việt
                 bool isBankSms = body.toLowerCase().contains('vnd') ||
-                    body.toLowerCase().contains('đ') ||
+                    body.toLowerCase().contains('vnđ') ||
                     body.toLowerCase().contains('tai khoan') ||
-                    body.toLowerCase().contains('tk');
+                    body.toLowerCase().contains('so du') ||
+                    RegExp(r'\bTK\b', caseSensitive: false).hasMatch(body);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),

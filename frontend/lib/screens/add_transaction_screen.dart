@@ -227,14 +227,16 @@ class _AddTransactionScreenState
                   ),
                 ),
               ),
-              ..._wallets.map(
+              // F14 Fix: Lọc loại bỏ ví nguồn khỏi danh sách trước khi render để không để lại khoảng trống SizedBox.shrink() layout
+              ..._wallets.where((wallet) {
+                if (isTargetWallet && (wallet['id'] as int) == _selectedWalletId) {
+                  return false;
+                }
+                return true;
+              }).map(
                     (wallet) {
                   final balance = wallet['balance'] as int;
                   final walletId = wallet['id'] as int;
-
-                  if (isTargetWallet && walletId == _selectedWalletId) {
-                    return const SizedBox.shrink();
-                  }
 
                   return ListTile(
                     leading: const Icon(

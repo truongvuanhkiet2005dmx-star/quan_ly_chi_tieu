@@ -219,10 +219,21 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     final addAmt = int.tryParse(amountController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
                     if (addAmt <= 0) return;
 
-                    // F14 Fix: Trừ tiền ở ví nguồn và tạo giao dịch chi tiêu tương ứng
+                    // F14 & F4 Fix: Kiểm tra số dư ví trước khi trừ tiền nạp hũ
                     final wallet = await DatabaseHelper.instance.getWalletById(selectedWalletId);
                     if (wallet != null) {
                       final currentWalletBal = (wallet['balance'] as num?)?.toInt() ?? 0;
+                      if (currentWalletBal < addAmt) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Số dư ví không đủ để nạp vào hũ tiết kiệm!'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
                       await DatabaseHelper.instance.updateWalletBalance(selectedWalletId, currentWalletBal - addAmt);
 
                       await DatabaseHelper.instance.insertTransaction({
