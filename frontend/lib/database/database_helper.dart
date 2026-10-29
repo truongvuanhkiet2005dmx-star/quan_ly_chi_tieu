@@ -192,8 +192,13 @@ class DatabaseHelper {
           ALTER TABLE users
           ADD COLUMN firebaseUid TEXT
         ''');
+      } catch (_) {}
+
+      try {
+        // F10 Fix: Dọn dẹp chuỗi rỗng thành NULL trước khi tạo UNIQUE INDEX
+        await db.execute("UPDATE users SET firebaseUid = NULL WHERE firebaseUid = '' OR firebaseUid = 'null'");
         await db.execute('''
-          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebaseUid ON users(firebaseUid)
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebaseUid ON users(firebaseUid) WHERE firebaseUid IS NOT NULL
         ''');
       } catch (_) {}
 

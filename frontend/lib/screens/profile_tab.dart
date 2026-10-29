@@ -136,11 +136,11 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (ctx) {
         return _CategoryManagementModal(
           categories: _customCategories,
-          onCategoryAdded: (newCat) {
+          onCategoryAdded: (newCat) async {
             setState(() {
               _customCategories.add(newCat);
             });
-            _saveCustomCategories();
+            await _saveCustomCategories();
           },
         );
       },
@@ -548,6 +548,8 @@ class _FamilyWalletModalState extends State<_FamilyWalletModal> {
   final _emailController = TextEditingController();
   final _budgetController = TextEditingController();
 
+  bool _isSubmitting = false;
+
   @override
   void initState() {
     super.initState();
@@ -604,7 +606,10 @@ class _FamilyWalletModalState extends State<_FamilyWalletModal> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14)),
-              onPressed: () async {
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                setState(() => _isSubmitting = true);
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('family_budget', _budgetController.text.trim());
                 await prefs.setString('family_email', _emailController.text.trim());

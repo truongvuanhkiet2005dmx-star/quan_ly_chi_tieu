@@ -143,7 +143,7 @@ class _AddTransactionScreenState
       return;
     }
 
-    if (key == '✓' || key == 'LƯU') {
+    if (key == '✓') {
       _saveTransaction();
       return;
     }

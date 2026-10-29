@@ -155,7 +155,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             ),
             onPressed: () async {
               await NativeListenerBridge.openNotificationPermissionSettings();
-              _loadHomeData();
+              await _loadHomeData();
             },
             child: const Text('Bật ngay', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
@@ -215,16 +215,24 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               onPressed: () async {
                 final text = controller.text.trim();
                 if (text.isNotEmpty) {
-                  await AutoTransactionService.instance.processSmsContent(text, force: true);
-                  if (!mounted) return;
-                  Navigator.pop(ctx);
-                  _loadHomeData();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã đồng bộ số dư và trừ tiền thành công!'), backgroundColor: Colors.green),
-                  );
+                  try {
+                    await AutoTransactionService.instance.processSmsContent(text, force: true);
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    await _loadHomeData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã bóc tách & ghi nhận biến động số dư ngân hàng thành công!'), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nội dung không hợp lệ hoặc không tìm thấy ví phù hợp!'), backgroundColor: Colors.red),
+                    );
+                  }
                 }
               },
-              child: const Text('Đồng bộ & Trừ tiền', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              child: const Text('Đồng bộ ngay', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             ),
           ],
         );
